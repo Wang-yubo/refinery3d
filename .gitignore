@@ -1,0 +1,10 @@
+node_modules/
+.npm-cache/
+diag/
+.DS_Store
+*.log
+
+# scratch diagnostics
+tools/*.png
+tools/verify-*.mjs
+tools/timing-check.mjs

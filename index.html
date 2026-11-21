@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>石油炼化厂 · 3D 场景</title>
+<link rel="icon" href="data:," />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05080c; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; inset: 0; pointer-events: none; font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    color: #eaf2f8;
+  }
+  #title {
+    position: absolute; left: 42px; top: 36px;
+  }
+  #title h1 { margin: 0; font-size: 25px; letter-spacing: 3px; font-weight: 600; }
+  #title p { margin: 8px 0 0; font-size: 12px; letter-spacing: 2px; color: #9fb6c6; text-transform: uppercase; }
+  #bar {
+    position: absolute; left: 42px; bottom: 34px; display: flex; gap: 8px; flex-wrap: wrap;
+    pointer-events: auto; max-width: 70vw;
+  }
+  #bar button {
+    background: rgba(12,22,32,0.55); border: 1px solid rgba(140,190,220,0.25); color: #d7e7f2;
+    padding: 8px 15px; border-radius: 3px; font-size: 12px; letter-spacing: 1px; cursor: pointer;
+    backdrop-filter: blur(8px); transition: all .18s ease;
+  }
+  #bar button:hover { border-color: rgba(120,210,255,0.7); color: #fff; background: rgba(20,40,58,0.7); }
+  #bar button.active { border-color: #5fd0ff; color: #5fd0ff; }
+  #hint {
+    position: absolute; right: 42px; bottom: 36px; font-size: 11px; color: #7f95a6; letter-spacing: 1px; text-align: right;
+  }
+  #loading {
+    position: fixed; inset: 0; background: #05080c; display: flex; align-items: center; justify-content: center;
+    color: #7f95a6; font-size: 13px; letter-spacing: 4px; font-family: "PingFang SC", sans-serif; z-index: 10;
+    transition: opacity .6s ease;
+  }
+  body.clean #ui { display: none; }
+  #flowui { display: none; }
+  body.flow #flowui {
+    display: block; position: fixed; inset: 0; pointer-events: none;
+    font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif; color: #eaf4fb;
+  }
+  body.flow #flowui .ftitle { position: absolute; left: 54px; top: 46px; }
+  body.flow #flowui .ftitle h2 { margin: 0; font-size: 27px; font-weight: 600; letter-spacing: 4px; }
+  body.flow #flowui .ftitle p { margin: 9px 0 0; font-size: 11px; letter-spacing: 3px; color: #7f9cb0; }
+  body.flow #flowui .ftitle i { display: block; width: 46px; height: 2px; background: #5fd0ff; margin-top: 14px; }
+  body.flow #flowui .fchain {
+    position: absolute; left: 50%; bottom: 42px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 12px; padding: 14px 22px;
+    background: rgba(6,14,22,0.62); border: 1px solid rgba(120,190,225,0.22);
+    backdrop-filter: blur(10px); border-radius: 4px;
+  }
+  body.flow #flowui .fstep { display: flex; flex-direction: column; gap: 4px; min-width: 92px; }
+  body.flow #flowui .fstep em { font-style: normal; font-size: 10px; letter-spacing: 2px; color: #5fd0ff; }
+  body.flow #flowui .fstep span { font-size: 14px; letter-spacing: 1px; white-space: nowrap; }
+  body.flow #flowui .farrow { color: #4d7e96; font-size: 13px; }
+  body.flow #flowui .fnote {
+    position: absolute; right: 54px; bottom: 46px; font-size: 10px; letter-spacing: 1px; color: #6d8798;
+  }
+  /* 流程示意模式：流程条自带标题，隐藏原主标题避免重叠；
+     机位按钮上移到流程条上方，避免遮挡流程条 */
+  body.flow #title { display: none; }
+  body.flow #bar { bottom: 126px; }
+  body.flow #hint { display: none; }
+  /* 说明文字移到流程条上方，窄屏下也不会压住流程条 */
+  body.flow #flowui .fnote { bottom: 118px; }
+  body.clean #loading { display: none; }
+
+  /* ---------- 工艺流程动画 HUD ---------- */
+  #animui { display: none; }
+  body.anim #animui {
+    display: block; position: fixed; inset: 0; pointer-events: none;
+    font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif; color: #eaf4fb;
+  }
+  #animui .apanel {
+    position: absolute; right: 42px; top: 50%; transform: translateY(-50%);
+    width: 338px; padding: 20px 22px 16px;
+    background: linear-gradient(155deg, rgba(10,20,30,0.78), rgba(5,11,18,0.62));
+    border: 1px solid rgba(120,190,225,0.22);
+    border-left: 2px solid var(--accent, #5fd0ff);
+    border-radius: 6px; backdrop-filter: blur(14px);
+    box-shadow: 0 20px 48px rgba(0,0,0,0.42);
+    pointer-events: auto;
+  }
+  #animui .ahead { display: flex; align-items: flex-start; gap: 14px; }
+  #animui .anum {
+    font-size: 40px; line-height: 0.95; font-weight: 200; color: var(--accent, #5fd0ff);
+    letter-spacing: 1px; min-width: 56px; font-variant-numeric: tabular-nums;
+  }
+  #animui .acn { font-size: 21px; font-weight: 600; letter-spacing: 3px; line-height: 1.25; }
+  #animui .aen { margin-top: 6px; font-size: 9px; letter-spacing: 2px; color: #7f9cb0; }
+  #animui .adesc {
+    margin: 15px 0 16px; font-size: 12px; line-height: 1.95; color: #b9cfdd;
+    letter-spacing: 0.3px; min-height: 70px;
+  }
+  #animui .adots { display: flex; gap: 5px; margin-bottom: 11px; }
+  #animui .adots span {
+    flex: 1; font-size: 9px; letter-spacing: 1px; text-align: center; padding: 4px 0 5px;
+    color: #5f798a; border-top: 2px solid rgba(120,190,225,0.18);
+    cursor: pointer; transition: color .2s ease, border-color .2s ease;
+  }
+  #animui .adots span.done { color: #8fb7cc; border-top-color: rgba(95,208,255,0.45); }
+  #animui .adots span.on { color: var(--accent, #5fd0ff); border-top-color: var(--accent, #5fd0ff); }
+  #animui .atrack { height: 2px; background: rgba(120,190,225,0.16); overflow: hidden; }
+  #animui .afill {
+    height: 100%; width: 0%; background: linear-gradient(90deg, rgba(95,208,255,0.3), var(--accent, #5fd0ff));
+    box-shadow: 0 0 10px var(--accent, #5fd0ff); transition: width .15s linear;
+  }
+  #animui .ameter {
+    display: flex; justify-content: space-between; margin-top: 8px;
+    font-size: 9px; letter-spacing: 1.5px; color: #6d8798; font-variant-numeric: tabular-nums;
+  }
+  #animui .aflowtag { color: #557080; }
+  #animui .abtns { display: flex; gap: 6px; margin-top: 16px; }
+  #animui .abtns button {
+    background: rgba(10,22,34,0.7); border: 1px solid rgba(140,190,220,0.22); color: #cfe4f0;
+    height: 30px; min-width: 32px; padding: 0 9px; border-radius: 3px; font-size: 11px;
+    letter-spacing: 1px; cursor: pointer; transition: all .16s ease; font-family: inherit;
+  }
+  #animui .abtns button:hover { border-color: rgba(120,210,255,0.7); color: #fff; background: rgba(20,40,58,0.8); }
+  #animui .abtns button.on { border-color: var(--accent, #5fd0ff); color: var(--accent, #5fd0ff); }
+  #animui .abtns .ap { min-width: 40px; font-size: 10px; }
+  #animui .abtns .agap { flex: 1; }
+  #animui .akeys { margin-top: 12px; font-size: 9px; letter-spacing: 1px; color: #5c7484; }
+  body.clean #animui .abtns, body.clean #animui .akeys { display: none; }
+  body.clean #animui .adesc { min-height: 0; }
+  #bar button.animshot { border-color: rgba(95,208,255,0.45); color: #b8e6ff; }
+  #bar button.animshot.active { border-color: #5fd0ff; color: #5fd0ff; }
+
+  /* ---------- 设备交互 ---------- */
+  #picktip {
+    position: fixed; left: 0; top: 0; z-index: 40; display: none; pointer-events: none;
+    padding: 6px 10px 7px; background: rgba(6,14,22,0.88); border: 1px solid rgba(120,190,225,0.4);
+    border-radius: 3px; color: #eaf4fb; white-space: nowrap;
+    font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.4);
+  }
+  #picktip b { font-size: 12px; font-weight: 600; letter-spacing: 1px; }
+  #picktip span { margin-left: 7px; font-size: 9px; letter-spacing: 1px; color: #86a9bd; }
+  #equip {
+    position: fixed; left: 42px; top: 146px; width: 338px; z-index: 22; display: none;
+    padding: 18px 20px 16px; box-sizing: border-box;
+    background: linear-gradient(160deg, rgba(10,23,35,0.9), rgba(5,12,20,0.84));
+    border: 1px solid rgba(120,190,225,0.24); border-left: 2px solid var(--ecolor, #5fd0ff);
+    border-radius: 4px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 22px 60px rgba(0,0,0,0.5); color: #eaf4fb;
+    font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  #equip.open { display: block; animation: equipIn .26s cubic-bezier(.2,.8,.2,1); }
+  @keyframes equipIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  #equip .eclose {
+    position: absolute; right: 8px; top: 6px; width: 24px; height: 24px; border: 0;
+    background: transparent; color: #7f9cb0; font-size: 12px; cursor: pointer; border-radius: 3px;
+  }
+  #equip .eclose:hover { color: #fff; background: rgba(120,190,225,0.12); }
+  #equip .ecat { font-size: 10px; letter-spacing: 2px; color: #7fa3b8; padding-right: 26px; }
+  #equip h3 { margin: 8px 0 3px; font-size: 23px; font-weight: 600; letter-spacing: 1px; line-height: 1.2; }
+  #equip .een { margin: 0 0 11px; font-size: 9px; letter-spacing: 2px; color: #7fa3b8; text-transform: uppercase; }
+  #equip .edesc { margin: 0 0 13px; font-size: 12px; line-height: 1.75; color: #b9cddb; }
+  #equip .especs { margin: 0 0 15px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; }
+  #equip .especs div { border-top: 1px solid rgba(120,190,225,0.16); padding-top: 6px; }
+  #equip .especs dt { font-size: 10px; letter-spacing: 1px; color: #7fa3b8; }
+  #equip .especs dd { margin: 4px 0 0; font-size: 13px; color: #e8f3fa; }
+  #equip .ebtns { display: flex; gap: 8px; }
+  #equip .ebtns button {
+    flex: 1; height: 30px; background: rgba(10,22,34,0.7); border: 1px solid rgba(140,190,220,0.22);
+    color: #cfe4f0; border-radius: 3px; font-size: 11px; letter-spacing: 1px; cursor: pointer;
+    font-family: inherit; transition: all .16s ease;
+  }
+  #equip .ebtns button:hover { border-color: rgba(120,210,255,0.7); color: #fff; background: rgba(20,40,58,0.8); }
+  #equip #equip-focus { border-color: rgba(95,208,255,0.5); color: #5fd0ff; }
+  body.clean #equip, body.clean #picktip { display: none !important; }
+</style>
+</head>
+<body>
+<div id="loading">正在构建三维场景 …</div>
+<div id="flowui">
+  <div class="ftitle">
+    <h2>石油炼化工艺流程</h2>
+    <p>PETROLEUM REFINING PROCESS FLOW</p>
+    <i></i>
+  </div>
+  <div class="fchain">
+    <div class="fstep"><em>01</em><span>原油储运</span></div>
+    <div class="farrow">→</div>
+    <div class="fstep"><em>02</em><span>常减压蒸馏</span></div>
+    <div class="farrow">→</div>
+    <div class="fstep"><em>03</em><span>催化裂化</span></div>
+    <div class="farrow">→</div>
+    <div class="fstep"><em>04</em><span>重整 / 加氢</span></div>
+    <div class="farrow">→</div>
+    <div class="fstep"><em>05</em><span>产品调和</span></div>
+    <div class="farrow">→</div>
+    <div class="fstep"><em>06</em><span>装卸出厂</span></div>
+  </div>
+  <div class="fnote">示意场景 · 装置布局与管廊走向为艺术化处理</div>
+</div>
+<div id="ui">
+  <div id="title">
+    <h1>石油炼化生产场景</h1>
+    <p>Petroleum Refining Complex · 3D Model</p>
+  </div>
+  <div id="bar"></div>
+  <div id="hint">点击设备查看参数 · 拖拽旋转 · 滚轮缩放<br/>1–9 切换机位 · 空格 播放 · ←/→ 阶段 · T 巡游</div>
+</div>
+<aside id="equip">
+  <button class="eclose" id="equip-close" title="关闭">✕</button>
+  <div class="ecat" id="equip-cat"></div>
+  <h3 id="equip-cn"></h3>
+  <p class="een" id="equip-en"></p>
+  <p class="edesc" id="equip-desc"></p>
+  <dl class="especs" id="equip-specs"></dl>
+  <div class="ebtns">
+    <button id="equip-focus">⌖ 机位聚焦</button>
+    <button id="equip-close2">关闭</button>
+  </div>
+</aside>
+<div id="picktip"><b id="picktip-cn"></b><span id="picktip-en"></span></div>
+<div id="animui">
+  <div class="apanel" id="apanel">
+    <div class="ahead">
+      <div class="anum" id="astage-num">01</div>
+      <div class="atitle">
+        <div class="acn" id="astage-cn">原油储运</div>
+        <div class="aen" id="astage-en">CRUDE OIL STORAGE &amp; TRANSPORT</div>
+      </div>
+    </div>
+    <p class="adesc" id="astage-desc">原油自码头与罐区经泵组、计量和管廊送入常减压装置，浮顶罐维持稳定进料。</p>
+    <div class="adots" id="adots"></div>
+    <div class="atrack"><div class="afill" id="abar"></div></div>
+    <div class="ameter"><span id="atime">00:00 / 01:12</span><span class="aflowtag">MATERIAL FLOW</span></div>
+    <div class="abtns">
+      <button data-act="prev" title="上一阶段">◀</button>
+      <button data-act="play" class="ap" title="播放 / 暂停">❚❚</button>
+      <button data-act="next" title="下一阶段">▶</button>
+      <span class="agap"></span>
+      <button data-speed="0.5">0.5×</button>
+      <button data-speed="1" class="on">1×</button>
+      <button data-speed="2">2×</button>
+      <button data-act="cruise" class="acruise">自动巡游</button>
+    </div>
+    <div class="akeys">空格 播放/暂停 · ←/→ 切换阶段 · T 自动巡游</div>
+  </div>
+</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
