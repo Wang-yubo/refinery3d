@@ -47,6 +47,77 @@ node tools/serve.mjs . 4321
 - 点击设备查看参数，详见下节
 - URL 参数：`?shot=night` 指定初始机位、`?clean=1` 隐藏界面（用于截图）
 
+## 画质与性能（A 批优化）
+
+场景提供三档画质，默认按设备能力自动选择；也可用 URL 参数强制指定。
+
+| 档位 | Pixel Ratio 上限 | 阴影贴图 | Bloom | SSAO | 接触阴影 | FXAA | 景深 | 夜间点光 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **high** | 2.0 | 2048² | 开 | 开 | 开 | 开 | 机位截图 / 巡游 | 12 |
+| **mid** | 1.5 | 1024² | 开 | 关 | 开 | 开 | 关 | 6 |
+| **low** | 1.2 | 512² | 关 | 关 | 关 | 关 | 关 | 2 |
+
+自动选择规则：`hardwareConcurrency <= 4` 或 `devicePixelRatio > 2` → low；触屏 / 窄屏（< 1024 或高 < 720）→ mid；其余桌面 → high。右下角「画质 HIGH」小按钮可在三档间循环，`clean=1` 截图模式自动隐藏。
+
+### URL 参数
+
+| 参数 | 说明 |
+| --- | --- |
+| `?q=high / mid / low` | 强制画质档位；显式指定时禁用自动降档 |
+| `?stats=1` | 左上角显示 FPS / draw calls / triangles / 档位面板；按 `P` 切换 |
+| `?prebaked=1` | 加载构建期烘焙几何快照（默认开启） |
+| `?procedural=1` | 回退到实时程序化建模 + `bakeStatic`（兼容/调试） |
+| `?dof=1` / `?dof=0` | 强制开启 / 关闭景深 |
+| `?autoexposure=0` | 关闭自动曝光（曝光锁定在预设值） |
+| `?autoq=0` | 关闭 FPS 自动降档 |
+| `?clean=1` | 隐藏 HUD，用于可复现截图（同时禁用自动降档） |
+
+### 性能数据（本机无头 Chrome + ANGLE Metal，1920×1080）
+
+| 指标 | 数值 |
+| --- | --- |
+| high 交互 FPS（景深关闭） | ≈ 33.4（1920×1080） |
+| high 截图 FPS（景深开启） | ≈ 28.3（景深开销 15.3%） |
+| high 交互 FPS（1280×720） | 60（vsync 上限） |
+| low 交互 FPS（1280×720） | 60（vsync 上限） |
+| high draw calls / triangles | 244 / ≈ 1.05 M（预烘焙路径） |
+| 冷启动到 `__ready`（预烘焙，high） | ≈ 44 s |
+| 冷启动到 `__ready`（`?procedural=1`，high） | ≈ 62 s |
+| 预烘焙相对实时代码构建的首帧降幅 | ≈ 29% |
+
+> 测试环境为无头软件渲染（`--enable-unsafe-swiftshader --use-angle=metal`），实际带独立 GPU 的桌面浏览器会明显更快；1280×720 下 high/low 都可能被 60 Hz vsync 截顶，因此低档收益主要体现在 1920×1080 与移动端高 DPR 场景。首帧主要受 40+ 材质变体的 GPU shader 编译限制。
+
+### 程序化 API
+
+| API | 说明 |
+| --- | --- |
+| `window.__quality` | 当前档位 |
+| `window.__setQuality(q)` | 切换档位并重建 render target 尺寸，返回当前档位 |
+| `window.__perf()` | `{fps, calls, triangles, quality, pixelRatio, ao, dof, fxaa, bloom, exposure}` |
+| `window.__setStats(on)` | 显示 / 隐藏性能面板 |
+| `window.__bench(n)` | 同步渲染 n 帧，返回 `msPerFrame` / `fps`（绕过 vsync） |
+| `window.__setDof(on)` | 强制景深开关 |
+| `window.__setAO(on)` / `__setContactShadows(on)` / `__setBloom(on)` / `__setFXAA(on)` | 分项调试开关 |
+| `window.__shadowInfo()` | 当前阴影相机尺寸、贴图大小与焦点 |
+
+### A 批改动
+
+- **A1 环境光照**：用天空 shader 通过 `PMREMGenerator.fromScene()` 生成 PMREM 环境图，dusk/day/night 三套缓存；金属、玻璃、水面使用更高 `envMapIntensity`，混凝土、沥青、植被保持低位；重新标定曝光，避免场景发灰/过曝。
+- **A2 画质分档**：high/mid/low 三档控制 pixel ratio、阴影贴图、Bloom、SSAO、接触阴影、FXAA、景深、夜间点光数量；新增 HUD 切换按钮、性能面板、`?q` / `?stats` / `?autoq` 参数；连续 5 s FPS < 35 自动降一档。
+- **A3 AO / 接触阴影**：vendor 未附带 GTAO/SSAO/SMAA，故自行实现基于 RenderPass 深度纹理的 SSAO（10 taps、保守强度）；为罐区、塔器、建筑、冷却塔、装车棚等设备底部加入合并为单 draw call 的程序化接触阴影（`bakeStatic` 之后加入，避免合并）。
+- **A4 阴影 / 抗锯齿**：阴影相机按机位焦距收紧（近景 cdu 焦区约 ±95 m，2048² 贴图下约 0.09 m/texel），相机拖拽时节流重算；新增 FXAA pass，high/mid 开启，low 关闭。
+- **A5 电影感后处理**：色差、柔暗角、细颗粒、±8% 缓慢曝光自适应；景深只在机位截图 / 巡游时开启，拖拽或流程标签时自动关闭，`?dof=1` 可强制。
+- **A6 冷启动**：`tools/build-baked.mjs` 在构建期导出 `bakeStatic` 后的 41 个合并 Mesh（position/normal/uv/index + 材质名）到 `assets/baked.bin`（20.5 MB）/ `assets/baked.json`；运行时默认先 fetch 快照并直接 `BufferGeometry.setAttribute` 重建，跳过 units/plant 构建与 bake。标签、夜间光晕、蒸汽、火炬火焰、控制室玻璃由 `createPlantDecor()` 补充；`?procedural=1` 可回退。
+
+### 重新生成预烘焙快照
+
+```bash
+node tools/build-baked.mjs   # 实时构建一次并写入 assets/baked.bin/json
+node tools/opt-shots.mjs     # 生成 renders/opt/ 下的 A 批对比截图与 stats.json
+```
+
+> **已知限制**：无头 Chrome / ANGLE Metal 的首帧主要耗时在 40+ 个材质变体的 GPU shader 编译（约 24 s），快照只能消除约 10–15 s 的建模与 bake 时间，尚未达到「首帧 < 10 s」的目标；在真实 GPU 与已预热 shader 缓存的浏览器中，首帧会显著缩短。SSAO 为自研简化实现，不是 GTAO；DOF 为 12 taps 简化 bokeh。
+
 ## 设备交互
 
 场景中 35 台主要设备可点击：6 座原油储罐、3 座液化气球罐、常减压塔器/加热炉/换热器/空冷器、FCC 反应器/再生器/分馏塔/烟囱/主风机、重整反应器组/加热炉/压缩机房、冷却塔、锅炉房、火炬、调和罐组、装车棚、主管廊、办公楼与中控室。

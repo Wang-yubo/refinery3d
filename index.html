@@ -33,6 +33,22 @@
   #hint {
     position: absolute; right: 42px; bottom: 36px; font-size: 11px; color: #7f95a6; letter-spacing: 1px; text-align: right;
   }
+  /* 画质切换：不显眼的小按钮；clean 截图模式隐藏 */
+  #quality-btn {
+    position: absolute; right: 42px; bottom: 82px; pointer-events: auto; cursor: pointer;
+    background: rgba(10,20,30,0.42); border: 1px solid rgba(120,190,225,0.2); color: #7f9db0;
+    padding: 5px 10px; border-radius: 3px; font-family: "PingFang SC", sans-serif;
+    font-size: 9px; letter-spacing: 1.5px; backdrop-filter: blur(8px);
+    transition: color .18s ease, border-color .18s ease;
+  }
+  #quality-btn:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+  body.clean #quality-btn { display: none; }
+  #perf {
+    position: absolute; left: 16px; top: 16px; display: none; white-space: pre;
+    padding: 8px 11px; background: rgba(4,10,16,0.72); border: 1px solid rgba(95,208,255,0.22);
+    border-radius: 3px; color: #8fd6f5; font: 10px/1.65 "SF Mono", Menlo, monospace;
+    letter-spacing: .5px; pointer-events: none; z-index: 31;
+  }
   #loading {
     position: fixed; inset: 0; background: #05080c; display: flex; align-items: center; justify-content: center;
     color: #7f95a6; font-size: 13px; letter-spacing: 4px; font-family: "PingFang SC", sans-serif; z-index: 10;
@@ -206,6 +222,8 @@
   </div>
   <div id="bar"></div>
   <div id="hint">点击设备查看参数 · 拖拽旋转 · 滚轮缩放<br/>1–9 切换机位 · 空格 播放 · ←/→ 阶段 · T 巡游</div>
+  <button id="quality-btn" title="切换画质（high / mid / low）">画质 HIGH</button>
+  <div id="perf"></div>
 </div>
 <aside id="equip">
   <button class="eclose" id="equip-close" title="关闭">✕</button>

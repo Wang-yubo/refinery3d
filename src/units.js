@@ -424,7 +424,12 @@ export function flareStack(m, { h = 72, r = 1.0 } = {}) {
     const a = (i / 3) * Math.PI * 2;
     g.add(cyl(0.16, 0.16, 1.6, m.pipeGray, Math.cos(a) * 1.5, h + 1.6, Math.sin(a) * 1.5, 6, 0.4, 0, 0));
   }
-  // flame
+  g.add(createFlareFlame(m, { h }));
+  return g;
+}
+
+/** 只创建火炬顶部的火焰 / 烟雾 / 光晕，供预烘焙场景补充动态代理 */
+export function createFlareFlame(m, { h = 72 } = {}) {
   const flame = new THREE.Group();
   const f1 = new THREE.Mesh(new THREE.ConeGeometry(2.0, 9, 14, 1, true), m.flame.clone());
   f1.position.y = h + 5.6;
@@ -435,14 +440,12 @@ export function flareStack(m, { h = 72, r = 1.0 } = {}) {
   const glow = makeGlow(m.glowTex, 0xffa347, 34, 0.85);
   glow.position.y = h + 6;
   flame.add(glow);
-  // smoke puffs
   for (let i = 0; i < 9; i++) {
     const s = makeGlow(m.smokeTex, 0x2a2a30, 8 + i * 2.6, 0.14 - i * 0.008);
     s.position.set(1.5 + i * 1.9, h + 9 + i * 3.4, 0.8);
     flame.add(s);
   }
-  g.add(flame);
-  return g;
+  return flame;
 }
 
 /* ------------------------------------------------------------------ */

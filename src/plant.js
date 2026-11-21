@@ -3,7 +3,7 @@ import { box, cyl, sphere, torus, pipeRun, railingLine, ladder, labelSprite, lea
 import {
   storageTank, sphereTank, column, furnace, heatExchanger, airCooler, pipeRack,
   coolingTower, flareStack, chimney, building, loadingGantry, tankTruck, car,
-  transformer, lampPost, tree, latticeTower,
+  transformer, lampPost, tree, latticeTower, createFlareFlame,
 } from './units.js';
 
 const V = (x, y, z) => [x, y, z];
@@ -542,5 +542,34 @@ export function createPlant(m) {
   const nightGlow = createNightGlow(m);
   root.add(nightGlow);
 
+  return { root, labels, nightGlow };
+}
+/* ------------------------------------------------------------------ */
+/* 预烘焙场景用的动态装饰：标签、夜间光晕、蒸汽、火炬火焰                  */
+/* ------------------------------------------------------------------ */
+function createSteamDecor(m) {
+  const g = new THREE.Group();
+  g.name = 'steam-decor';
+  for (const [x, z] of [[-22, 88], [18, 92]]) {
+    g.add(steamColumn(m, { x, z, y: 29, h: 40, count: 8, size: 13 }));
+  }
+  for (const x of [-9, 9]) {
+    g.add(steamColumn(m, { x, z: 54, y: 37, h: 22, count: 4, size: 7, tint: 0xcfd6d8 }));
+  }
+  g.add(steamColumn(m, { x: 142, z: -104, y: 46, h: 30, count: 6, size: 9, tint: 0xc9d2d6 }));
+  return g;
+}
+
+export function createPlantDecor(m) {
+  const root = new THREE.Group();
+  root.name = 'plant-decor';
+  const labels = createLabels(m);
+  const nightGlow = createNightGlow(m);
+  root.add(labels, nightGlow, createSteamDecor(m));
+  // 控制室玻璃幕墙在 bakeStatic 中因 transparent 被跳过，快照模式需补回
+  root.add(box(24, 8, 13, m.glass, -80, 4.4, 148));
+  const flame = createFlareFlame(m, { h: 74 });
+  flame.position.set(172, 0, -120);
+  root.add(flame);
   return { root, labels, nightGlow };
 }

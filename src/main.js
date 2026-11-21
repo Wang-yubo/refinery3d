@@ -3,14 +3,17 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createMaterials } from './materials.js';
 import { createSky, createLights, createGround, createHills, applyPreset, PRESETS } from './environment.js';
-import { createPlant } from './plant.js';
+import { createPlant, createPlantDecor } from './plant.js';
 import { bakeStatic } from './helpers.js';
 import { createAnimation } from './animation.js';
 import { createInteraction } from './interaction.js';
+import { createContactShadows } from './contacts.js';
+import { QUALITY_LEVELS, detectQuality } from './quality.js';
+import { SSAOPass, FXAAPass, CinematicPass, DepthOfFieldPass, createLuminanceMeter } from './postfx.js';
+import { loadPlantSnapshot } from './prebaked.js';
 
 const params = new URLSearchParams(location.search);
 const T0 = performance.now();
@@ -18,17 +21,28 @@ const mark = (label) => console.log(`[timing] ${label} ${((performance.now() - T
 const isClean = params.get('clean') === '1';
 if (isClean) document.body.classList.add('clean');
 
+/* 画质档位：URL 显式指定优先，否则按设备能力判断 */
+const qualityInfo = detectQuality(params);
+let quality = qualityInfo.level;
+let Q = QUALITY_LEVELS[quality];
+const qualityForced = qualityInfo.forced;
+/* 截图 / 自动测试模式不自动降档，保证 renders 可复现 */
+const autoDowngrade = !qualityForced && !isClean && params.get('autoq') !== '0';
+
 /* ------------------------------------------------------------------ */
 /* renderer / scene / camera                                           */
 /* ------------------------------------------------------------------ */
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pixelRatio));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = Q.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+/* 关闭 autoReset，让 __perf() 统计整帧所有 pass 的 draw call */
+renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -49,20 +63,109 @@ controls.maxDistance = 1400;
 /* materials / environment                                             */
 /* ------------------------------------------------------------------ */
 const m = createMaterials();
+Object.entries(m).forEach(([name, mat]) => { if (mat && mat.isMaterial) mat.name = name; });
 mark('materials');
 const { sky, uniforms: skyUniforms } = createSky();
 scene.add(sky);
 const lights = createLights();
+lights.sun.shadow.mapSize.set(Q.shadowMap, Q.shadowMap);
 scene.add(lights.sun, lights.sun.target, lights.hemi, lights.ambient, lights.fill);
+
+/* ---------- PMREM 环境贴图：复用天空 shader，每个预设生成一次并缓存 ---------- */
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+const envScene = new THREE.Scene();
+const envSky = new THREE.Mesh(new THREE.SphereGeometry(40, 48, 32), sky.material);
+envScene.add(envSky);
+const envCache = new Map();
+let pmremKey = '';
+
+function rebuildEnvironment(presetKey) {
+  if (presetKey === pmremKey) return;
+  pmremKey = presetKey;
+  let env = envCache.get(presetKey);
+  if (!env) {
+    env = pmrem.fromScene(envScene, 0.02, 0.1, 100).texture;
+    env.name = 'pmrem-' + presetKey;
+    envCache.set(presetKey, env);
+  }
+  scene.environment = env;
+  renderer.setRenderTarget(null);
+}
+
+/**
+ * 环境反射强度：金属/玻璃高、混凝土/植被低。
+ * 再乘预设系数，避免夜景泛灰或日景过曝。
+ */
+const ENV_INTENSITY = {
+  steel: 0.95, steelLight: 0.85, steelDark: 0.85, painted: 0.42,
+  insulation: 0.38, insulationDirty: 0.3, shell: 0.5, shellWhite: 0.5, rust: 0.25,
+  pipeSilver: 1.0, pipeGray: 0.92, pipeYellow: 0.62, pipeOrange: 0.55,
+  pipeGreen: 0.55, pipeRed: 0.58,
+  concrete: 0.12, concreteSmooth: 0.16, asphalt: 0.07, gravel: 0.08,
+  grass: 0.06, grating: 0.7, roadLine: 0.1,
+  railing: 0.68, railingGray: 0.75, ladder: 0.8, cable: 0.18, roof: 0.32,
+  building: 0.2, buildingWarm: 0.16, window: 0.5, glass: 1.35,
+  water: 1.25, treeLeaf: 0.07, treeLeaf2: 0.07, trunk: 0.08,
+  carBody: 0.8, carDark: 0.65, tankTruck: 0.8, fireRed: 0.5, blue: 0.55,
+  lampWarm: 0.2, lampCool: 0.2, beacon: 0.15,
+};
+const ENV_PRESET_SCALE = { dusk: 0.9, day: 1.0, night: 0.68, default: 0.9 };
+
+function applyMaterialEnv(presetKey = 'dusk') {
+  const ps = ENV_PRESET_SCALE[presetKey] ?? ENV_PRESET_SCALE.default;
+  for (const [name, mat] of Object.entries(m)) {
+    if (!mat || !mat.isMeshStandardMaterial || mat.transparent) continue;
+    const base = ENV_INTENSITY[name];
+    if (base === undefined) continue;
+    mat.envMapIntensity = base * ps;
+  }
+}
 
 const ground = createGround(m);
 ground.name = 'ground';
 scene.add(ground);
 scene.add(createHills(m));
 
-const { root: plant, labels, nightGlow } = createPlant(m);
-mark('plant built');
+/* 冷启动：默认读取构建期烘焙快照；?procedural=1 回退到实时建模 */
+const usePrebaked = params.get('procedural') !== '1' && params.get('prebaked') !== '0';
+let plant = null;
+let labels = null;
+let nightGlow = null;
+let usingPrebaked = false;
+const loadingEl = document.getElementById('loading');
+const setLoading = (text) => { if (loadingEl) loadingEl.textContent = text; };
+
+if (usePrebaked) {
+  try {
+    const tSnap = performance.now();
+    const snap = await loadPlantSnapshot(m, {
+      jsonUrl: './assets/baked.json',
+      binUrl: './assets/baked.bin',
+      onProgress: (p, text) => setLoading(text),
+    });
+    const tLoad = performance.now();
+    plant = snap.root;
+    const decor = createPlantDecor(m);
+    plant.add(decor.root);
+    labels = decor.labels;
+    nightGlow = decor.nightGlow;
+    usingPrebaked = true;
+    console.log(`[snapshot] load ${((tLoad - tSnap) / 1000).toFixed(1)}s decor ${((performance.now() - tLoad) / 1000).toFixed(1)}s`);
+    mark(`plant prebaked ${(snap.bytes / 1048576).toFixed(1)}MB/${snap.vertexCount} verts`);
+  } catch (err) {
+    console.warn('[prebaked] 快照不可用，回退实时建模：', err.message);
+  }
+}
+if (!plant) {
+  const built = createPlant(m);
+  plant = built.root;
+  labels = built.labels;
+  nightGlow = built.nightGlow;
+  mark('plant built');
+}
 scene.add(plant);
+window.__prebaked = usingPrebaked;
 
 // night point lights
 const nightLights = [];
@@ -95,45 +198,154 @@ const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, {
   type: THREE.HalfFloatType,
   samples: 4,
 });
+/* AO / DOF 需要 RenderPass 的深度；composer 的缓冲都会带 depthTexture */
+const depthTexture = new THREE.DepthTexture(innerWidth, innerHeight);
+depthTexture.type = THREE.UnsignedIntType;
+rt.depthTexture = depthTexture;
 const composer = new EffectComposer(renderer, rt);
 composer.setPixelRatio(renderer.getPixelRatio());
-composer.addPass(new RenderPass(scene, camera));
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const dofPass = new DepthOfFieldPass(camera, composer.readBuffer.depthTexture, { maxBlur: 8.0 });
+dofPass.enabled = false;
+composer.addPass(dofPass);
+
+const ssaoPass = new SSAOPass(camera, composer.readBuffer.depthTexture, { radius: 1.05, intensity: 0.58, bias: 0.04 });
+ssaoPass.enabled = false;
+composer.addPass(ssaoPass);
 
 const bloom = new UnrealBloomPass(size.clone(), 0.55, 0.7, 0.82);
 composer.addPass(bloom);
-composer.addPass(new OutputPass());
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
 
-const GradeShader = {
-  uniforms: {
-    tDiffuse: { value: null },
-    uVignette: { value: 0.55 },
-    uGrain: { value: 0.022 },
-    uTime: { value: 0 },
-    uRes: { value: new THREE.Vector2(innerWidth, innerHeight) },
-  },
-  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse;
-    uniform float uVignette;
-    uniform float uGrain;
-    uniform float uTime;
-    uniform vec2 uRes;
-    varying vec2 vUv;
-    float rand(vec2 co) {
-      return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+const cinematic = new CinematicPass();
+composer.addPass(cinematic);
+
+const fxaaPass = new FXAAPass();
+composer.addPass(fxaaPass);
+
+/* 曝光自适应：16x16 亮度采样，每 2s 更新一次，幅度 ±8% */
+const lumaMeter = createLuminanceMeter();
+let baseExposure = 1.0;
+let exposureScale = 1.0;
+let lumaTimer = 0;
+let measuredLuma = 0.45;
+let autoExposureEnabled = params.get('autoexposure') !== '0';
+const TARGET_LUMA = { dusk: 0.45, day: 0.54, night: 0.3, default: 0.45 };
+
+/* 景深调度：机位截图 / 巡游启用；拖拽、流程标签时关闭 */
+let dofHold = 0;
+let dofMode = params.get('dof') === '1' ? 'on' : (params.get('dof') === '0' ? 'off' : 'auto');
+let interacting = false;
+let currentShot = 'aerial';
+let currentPreset = PRESETS.dusk;
+let currentPresetKey = 'dusk';
+let interact = null;
+
+function updateDofState() {
+  let want = false;
+  if (dofMode === 'on') want = quality === 'high' && !labels.visible;
+  else if (dofMode === 'auto') {
+    want = quality === 'high' && !labels.visible && !interacting &&
+      (dofHold > 0 || (anim?.isActive?.() && anim.state.cruise === true));
+  }
+  dofPass.enabled = !!want;
+}
+
+/* ------------------------------------------------------------------ */
+/* quality / perf                                                      */
+/* ------------------------------------------------------------------ */
+let qualityBtn = null;
+let statsEl = null;
+let statsVisible = params.get('stats') === '1';
+let perf = { fps: 0, calls: 0, triangles: 0 };
+let frameCount = 0;
+let fpsWindowStart = performance.now();
+let lowFpsTime = 0;
+let autoQStart = 0;
+let lastQualityChange = performance.now();
+
+function updateStatsDom() {
+  if (!statsEl || !statsVisible) return;
+  statsEl.textContent =
+    `${perf.fps.toFixed(0)} FPS  ·  ${perf.calls} calls  ·  ${(perf.triangles / 1000).toFixed(0)}k tris\n` +
+    `${quality.toUpperCase()}  ·  dpr ${renderer.getPixelRatio().toFixed(2)}  ·  AO ${ssaoPass.enabled ? 'on' : 'off'}`;
+}
+
+function updateQualityButton() {
+  if (qualityBtn) qualityBtn.textContent = `画质 ${Q.label}`;
+}
+
+function setShadowMapSize() {
+  const sh = lights.sun.shadow;
+  sh.mapSize.set(Q.shadowMap, Q.shadowMap);
+  if (sh.map) { sh.map.dispose(); sh.map = null; }
+  renderer.shadowMap.needsUpdate = true;
+}
+
+function applyQuality(level, { announce = false } = {}) {
+  if (!QUALITY_LEVELS[level]) return false;
+  quality = level;
+  Q = QUALITY_LEVELS[level];
+  window.__quality = quality;
+
+  const pr = Math.min(window.devicePixelRatio || 1, Q.pixelRatio);
+  renderer.setPixelRatio(pr);
+  composer.setPixelRatio(pr);
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+
+  renderer.shadowMap.enabled = Q.shadows;
+  setShadowMapSize();
+  bloom.enabled = Q.bloom;
+  bloom.strength = currentPreset.bloom.strength * Q.bloomScale;
+  ssaoPass.enabled = Q.ao;
+  contactShadows.visible = Q.contactShadows;
+  fxaaPass.enabled = Q.fxaa;
+  if (!Q.dof) dofHold = 0;
+  if (!Q.contactShadows) contactShadows.visible = false;
+
+  nightLights.forEach((l, i) => { l.visible = currentPreset.stars > 0.3 && i < Q.pointLights; });
+  nightGlow.visible = currentPreset.stars > 0.3;
+  updateDofState();
+  updateQualityButton();
+  updateStatsDom();
+  lastQualityChange = performance.now();
+  lumaTimer = 0;
+  exposureScale = 1.0;
+  renderer.toneMappingExposure = baseExposure;
+
+  if (contactShadows && !Q.ao) contactShadows.visible = Q.contactShadows;
+  window.__quality = quality;
+  if (announce) console.info(`[quality] ${quality} (dpr ${pr.toFixed(2)}, shadow ${Q.shadowMap}, bloom ${Q.bloom}, ao ${Q.ao})`);
+  renderStats();
+  return true;
+}
+
+function bindQualityHud() {
+  if (isClean) return;
+  qualityBtn = document.getElementById('quality-btn');
+  statsEl = document.getElementById('perf');
+  if (statsEl) statsEl.style.display = statsVisible ? 'block' : 'none';
+  if (qualityBtn) {
+    updateQualityButton();
+    qualityBtn.addEventListener('click', () => {
+      const order = ['high', 'mid', 'low'];
+      const next = order[(order.indexOf(quality) + 1) % order.length];
+      applyQuality(next, { announce: true });
+    });
+  }
+  addEventListener('keydown', (e) => {
+    if (e.key === 'p' || e.key === 'P') {
+      statsVisible = !statsVisible;
+      if (statsEl) statsEl.style.display = statsVisible ? 'block' : 'none';
+      updateStatsDom();
     }
-    void main() {
-      vec4 c = texture2D(tDiffuse, vUv);
-      vec2 p = (vUv - 0.5) * vec2(1.0, 0.92);
-      float vig = smoothstep(0.92, 0.28, length(p));
-      c.rgb *= mix(1.0, vig, uVignette);
-      float g = rand(vUv * uRes + uTime) - 0.5;
-      c.rgb += g * uGrain;
-      gl_FragColor = c;
-    }`,
-};
-const grade = new ShaderPass(GradeShader);
-composer.addPass(grade);
+  });
+}
+bindQualityHud();
 
 /* ------------------------------------------------------------------ */
 /* shots                                                               */
@@ -168,10 +380,6 @@ const SHOTS = {
   },
 };
 
-let currentShot = 'aerial';
-let currentPreset = PRESETS.dusk;
-let interact = null;
-
 function syncBar(name) {
   document.querySelectorAll('#bar button').forEach((b) => b.classList.toggle('active', b.dataset.shot === name));
 }
@@ -179,7 +387,10 @@ function syncBar(name) {
 /** 应用光照预设（机位与 HUD 各自负责，方便动画模式复用） */
 function applyLook(p) {
   currentPreset = p;
+  currentPresetKey = Object.keys(PRESETS).find((k) => PRESETS[k] === p) || 'dusk';
   applyPreset(p, { skyUniforms, lights, scene, renderer });
+  rebuildEnvironment(currentPresetKey);
+  applyMaterialEnv(currentPresetKey);
 
   // emissive tuning
   m.lampWarm.emissiveIntensity = p.lampWarm;
@@ -188,14 +399,55 @@ function applyLook(p) {
   m.beacon.emissiveIntensity = p.stars > 0.3 ? 7 : 2;
   m.flame.opacity = p.stars > 0.3 ? 1.0 : 0.9;
 
-  bloom.strength = p.bloom.strength;
+  bloom.strength = p.bloom.strength * Q.bloomScale;
   bloom.radius = p.bloom.radius;
   bloom.threshold = p.bloom.threshold;
 
+  baseExposure = p.exposure * 0.90;
+  exposureScale = 1.0;
+  renderer.toneMappingExposure = baseExposure;
+
   const night = p.stars > 0.3;
-  nightLights.forEach((l) => { l.visible = night; });
+  nightLights.forEach((l, i) => { l.visible = night && i < Q.pointLights; });
   nightGlow.visible = night;
+  updateStatsDom();
   renderStats?.();
+}
+
+/**
+ * 阴影相机按机位收紧：远景覆盖全场，近景只覆盖焦区，显著提升阴影分辨率。
+ * 相机拖拽时按 0.5s 节流重算，避免每帧抖动。
+ */
+let lastShadowUpdate = 0;
+let lastShadowCam = new THREE.Vector3(1e9, 1e9, 1e9);
+function focusSunShadow(force = false) {
+  const now = performance.now();
+  if (!force && now - lastShadowUpdate < 500) return;
+  const camDist = camera.position.distanceTo(controls.target);
+  if (!force && camera.position.distanceToSquared(lastShadowCam) < 4) return;
+  lastShadowUpdate = now;
+  lastShadowCam.copy(camera.position);
+
+  const wide = ['aerial', 'day', 'flow', 'night'].includes(currentShot);
+  let radius;
+  if (currentShot === 'top') radius = 320;
+  else if (wide) radius = 330;
+  else radius = THREE.MathUtils.clamp(camDist * 0.72, 95, 240);
+
+  const dir = new THREE.Vector3(...(currentPreset.sunDir || [-0.5, 0.4, 0.6])).normalize();
+  const target = controls.target.clone();
+  // 近景把焦区稍微向镜头方向偏移，覆盖塔器底部与前景设备
+  if (!wide) target.addScaledVector(camera.position.clone().sub(target).normalize(), radius * 0.12);
+
+  lights.sun.target.position.copy(target);
+  lights.sun.target.updateMatrixWorld();
+  lights.sun.position.copy(target).addScaledVector(dir, 500);
+  const sc = lights.sun.shadow.camera;
+  sc.left = -radius; sc.right = radius;
+  sc.top = radius; sc.bottom = -radius;
+  sc.near = 20; sc.far = 1050;
+  sc.updateProjectionMatrix();
+  lights.sun.shadow.needsUpdate = true;
 }
 
 function setShot(name) {
@@ -203,6 +455,8 @@ function setShot(name) {
   if (name === 'process') {
     // 进入工艺流程动画模式
     currentShot = 'process';
+    dofHold = 0;
+    updateDofState();
     anim.enter({ stage: 0, immediate: false });
     if (!isClean) {
       syncBar('process');
@@ -229,6 +483,10 @@ function setShot(name) {
   document.body.classList.toggle('flow', !!s.labels);
 
   applyLook(p);
+  focusSunShadow(true);
+  dofHold = quality === 'high' ? 2.6 : 0;
+  updateDofState();
+  lowFpsTime = 0;
 
   if (!isClean) {
     syncBar(name);
@@ -267,14 +525,15 @@ if (!isClean) {
 /* ------------------------------------------------------------------ */
 /* bake static geometry, then render                                   */
 /* ------------------------------------------------------------------ */
-bakeStatic(plant);
+if (!usingPrebaked) bakeStatic(plant);
 bakeStatic(ground);
 mark('geometry baked');
 
-// mild material polish
-Object.values(m).forEach((mat) => {
-  if (mat && mat.isMeshStandardMaterial) mat.envMapIntensity = 0.6;
-});
+/* 接触阴影在 bake 之后加入，避免被合并进静态几何 */
+const contactShadows = createContactShadows();
+contactShadows.visible = Q.contactShadows;
+scene.add(contactShadows);
+mark('contact shadows');
 
 /* ------------------------------------------------------------------ */
 /* 工艺流程动画（在 bakeStatic 之后创建，避免被合并）                     */
@@ -307,20 +566,51 @@ interact = createInteraction({
     anim.exit();
     document.body.classList.remove('flow');
     labels.visible = false;
+    dofHold = 0;
+    updateDofState();
     if (!isClean) syncBar('');
   },
+});
+
+/* 初始应用一次档位（此时 anim / contactShadows 已就绪） */
+applyQuality(quality, { announce: false });
+
+/* 交互拖拽时关闭景深，避免卡顿 */
+controls.addEventListener('start', () => {
+  interacting = true;
+  dofHold = 0;
+  updateDofState();
+});
+controls.addEventListener('end', () => {
+  interacting = false;
+  updateDofState();
 });
 
 let lastFrame = performance.now();
 
 function renderStats() {
-  // no-op hook reserved for profiling
+  updateStatsDom();
 }
 
 function render() {
-  grade.uniforms.uTime.value = anim.time;
+  cinematic.material.uniforms.uTime.value = anim.time;
+  cinematic.material.uniforms.uExposure.value = 1.0;
   sky.position.copy(camera.position);
+
+  // RenderPass 的目标会因 pass 开关在 rt1/rt2 之间切换，每帧绑定当前深度
+  const depth = composer.readBuffer.depthTexture;
+  if (depth) {
+    dofPass.depthTexture = depth;
+    dofPass.material.uniforms.tDepth.value = depth;
+    ssaoPass.depthTexture = depth;
+    ssaoPass.material.uniforms.tDepth.value = depth;
+  }
+  if (dofPass.enabled) dofPass.setFocus(camera.position.distanceTo(controls.target));
+
+  renderer.info.reset();
   composer.render();
+  perf.calls = renderer.info.render.calls;
+  perf.triangles = renderer.info.render.triangles;
 }
 
 function animate() {
@@ -331,7 +621,50 @@ function animate() {
   anim.update(dt);
   controls.update();
   if (interact) interact.update(dt);
+
+  if (dofHold > 0) { dofHold -= dt; if (dofHold <= 0) updateDofState(); }
+  focusSunShadow();
+  updateDofState();
   render();
+
+  // ---- FPS / 自动降档（截图 clean 模式与显式 ?q= 不触发）----
+  frameCount++;
+  const win = now - fpsWindowStart;
+  if (win >= 500) {
+    perf.fps = (frameCount * 1000) / win;
+    frameCount = 0;
+    fpsWindowStart = now;
+    if (autoDowngrade && window.__ready && now > autoQStart && !document.hidden) {
+      if (perf.fps < 35) lowFpsTime += win / 1000;
+      else lowFpsTime = 0;
+      if (lowFpsTime >= 5 && quality !== 'low') {
+        const order = ['high', 'mid', 'low'];
+        const next = order[Math.min(order.length - 1, order.indexOf(quality) + 1)];
+        console.info(`[quality] auto downgrade ${quality} -> ${next}: FPS ${perf.fps.toFixed(1)} < 35 for 5s`);
+        applyQuality(next, { announce: true });
+        lowFpsTime = 0;
+      }
+    } else {
+      lowFpsTime = 0;
+    }
+    updateStatsDom();
+  }
+
+  // ---- 曝光自适应：2s 采样一次，缓慢向目标亮度靠拢 ----
+  if (autoExposureEnabled && window.__ready && !document.hidden) {
+    lumaTimer += dt;
+    if (lumaTimer >= 2) {
+      lumaTimer = 0;
+      measuredLuma = lumaMeter.sample(renderer, composer.readBuffer.texture);
+      const target = TARGET_LUMA[currentPresetKey] ?? TARGET_LUMA.default;
+      if (measuredLuma > 0.03 && measuredLuma < 0.9) {
+        const ratio = THREE.MathUtils.clamp(target / measuredLuma, 0.92, 1.08);
+        exposureScale = THREE.MathUtils.lerp(exposureScale, ratio, 0.35);
+        renderer.toneMappingExposure = baseExposure * exposureScale;
+      }
+      updateStatsDom();
+    }
+  }
 }
 
 function onResize() {
@@ -339,17 +672,75 @@ function onResize() {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
-  grade.uniforms.uRes.value.set(innerWidth, innerHeight);
   bloom.setSize(innerWidth, innerHeight);
+  dofPass.setSize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
+  ssaoPass.setSize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
+  fxaaPass.setSize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
+  cinematic.setSize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
 }
 addEventListener('resize', onResize);
 
-/* API for screenshots */
+/* API for screenshots / 性能与画质 */
 window.__shots = Object.keys(SHOTS);
+window.__quality = quality;
+window.__setQuality = (q) => {
+  const ok = applyQuality(String(q || '').toLowerCase(), { announce: true });
+  if (!ok) return { error: 'unknown quality', quality };
+  dofHold = quality === 'high' ? 2.6 : 0;
+  updateDofState();
+  render();
+  return { quality, pixelRatio: renderer.getPixelRatio() };
+};
+window.__perf = () => ({
+  fps: +perf.fps.toFixed(1),
+  calls: perf.calls,
+  triangles: perf.triangles,
+  quality,
+  pixelRatio: +renderer.getPixelRatio().toFixed(2),
+  measuredLuma: +measuredLuma.toFixed(3),
+  exposure: +renderer.toneMappingExposure.toFixed(3),
+  ao: ssaoPass.enabled,
+  dof: dofPass.enabled,
+  fxaa: fxaaPass.enabled,
+  bloom: bloom.enabled,
+});
+window.__bench = (n = 30) => {
+  render();
+  const t = performance.now();
+  for (let i = 0; i < n; i++) render();
+  return { frames: n, msPerFrame: +((performance.now() - t) / n).toFixed(2), fps: +(1000 / ((performance.now() - t) / n)).toFixed(1) };
+};
+window.__setStats = (on = true) => {
+  statsVisible = !!on;
+  if (statsEl) statsEl.style.display = statsVisible ? 'block' : 'none';
+  updateStatsDom();
+  return statsVisible;
+};
+window.__setDof = (on = true) => {
+  dofMode = on ? 'on' : 'off';
+  updateDofState();
+  render();
+  return dofPass.enabled;
+};
+window.__setAO = (on = true) => { ssaoPass.enabled = !!on; render(); return ssaoPass.enabled; };
+window.__setContactShadows = (on = true) => { contactShadows.visible = !!on; render(); return contactShadows.visible; };
+window.__setBloom = (on = true) => { bloom.enabled = !!on; render(); return bloom.enabled; };
+window.__setFXAA = (on = true) => { fxaaPass.enabled = !!on; render(); return fxaaPass.enabled; };
+window.__setCinematic = (on = true) => { cinematic.enabled = !!on; render(); return cinematic.enabled; };
+window.__setExposure = (v = 1) => { exposureScale = 1; baseExposure = Number(v) || 1; renderer.toneMappingExposure = baseExposure; render(); return baseExposure; };
+window.__shadowInfo = () => ({
+  mapSize: lights.sun.shadow.mapSize.toArray(),
+  left: +lights.sun.shadow.camera.left.toFixed(1),
+  right: +lights.sun.shadow.camera.right.toFixed(1),
+  near: +lights.sun.shadow.camera.near.toFixed(1),
+  far: +lights.sun.shadow.camera.far.toFixed(1),
+  target: lights.sun.target.position.toArray().map((v) => +v.toFixed(1)),
+});
+window.__qualityInfo = () => ({ ...qualityInfo, active: quality });
 window.__setShot = (name) => {
   setShot(name);
   render();
-  return { shot: currentShot, labels: labels.visible };
+  return { shot: currentShot, labels: labels.visible, quality };
 };
 window.__renderOnce = render;
 
@@ -481,17 +872,18 @@ if (loading) {
 
 window.__ready = true;
 window.__animReady = true;
+autoQStart = performance.now() + 6000;
 console.log('[refinery] ready', JSON.stringify({ shots: Object.keys(SHOTS), stages: anim.stages.length }));
 /* debug helpers (not used in production views) */
 window.__debug = (opts = {}) => {
-  const { fog = true, sky: skyOn = true, bloom: bloomOn = true, grade: gradeOn = true } = opts;
+  const { fog = true, sky: skyOn = true, bloom: bloomOn = true, cinematic: cineOn = true } = opts;
   scene.fog = fog ? new THREE.FogExp2(currentPreset.fog, currentPreset.fogDensity) : null;
   sky.visible = skyOn;
   bloom.enabled = bloomOn;
-  grade.enabled = gradeOn;
+  cinematic.enabled = cineOn;
   renderer.shadowMap.enabled = opts.shadows !== false;
   render();
-  return { fog, sky: skyOn, bloom: bloomOn, grade: gradeOn };
+  return { fog, sky: skyOn, bloom: bloomOn, cinematic: cineOn };
 };
 window.__probe = () => {
   const pts = {
@@ -510,6 +902,67 @@ window.__probe = () => {
   return out;
 };
 
+/* ------------------------------------------------------------------ */
+/* 构建期快照导出（tools/build-baked.mjs 使用）                          */
+/* ------------------------------------------------------------------ */
+let snapshotCache = null;
+window.__buildSnapshot = () => {
+  if (snapshotCache) return snapshotCache.meta;
+  const items = [];
+  const chunks = [];
+  const materials = new Set();
+  let bytes = 0;
+  const put = (arr, desc) => {
+    const pad = (4 - (bytes % 4)) % 4;
+    if (pad) { chunks.push(new Uint8Array(pad)); bytes += pad; }
+    const u8 = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+    desc.offset = bytes;
+    chunks.push(u8);
+    bytes += u8.length;
+  };
+  plant.traverse((o) => {
+    if (!o.isMesh || !o.userData.baked || !o.geometry) return;
+    const g = o.geometry;
+    if (!g.attributes.position || !g.attributes.normal || !g.attributes.uv || !g.index) return;
+    const pos = g.attributes.position.array;
+    const nor = g.attributes.normal.array;
+    const uv = g.attributes.uv.array;
+    const idx = g.index.array instanceof Uint32Array ? g.index.array : Uint32Array.from(g.index.array);
+    const item = {
+      material: o.userData.bakeMaterial || o.material.name || '',
+      castShadow: !!o.castShadow,
+      receiveShadow: !!o.receiveShadow,
+      position: { count: g.attributes.position.count },
+      normal: { count: g.attributes.normal.count },
+      uv: { count: g.attributes.uv.count },
+      index: { count: idx.length },
+    };
+    materials.add(item.material);
+    put(pos, item.position);
+    put(nor, item.normal);
+    put(uv, item.uv);
+    put(idx, item.index);
+    items.push(item);
+  });
+  const all = new Uint8Array(bytes);
+  let off = 0;
+  for (const c of chunks) { all.set(c, off); off += c.length; }
+  const meta = { version: 1, generator: 'refinery3d/bakeStatic', bytes, materials: [...materials], items };
+  snapshotCache = { meta, all };
+  return meta;
+};
+window.__snapshotChunk = (index, size = 4 * 1024 * 1024) => {
+  if (!snapshotCache) return null;
+  const start = index * size;
+  if (start >= snapshotCache.all.length) return null;
+  const view = snapshotCache.all.subarray(start, Math.min(snapshotCache.all.length, start + size));
+  let str = '';
+  for (let i = 0; i < view.length; i += 0x8000) {
+    str += String.fromCharCode.apply(null, view.subarray(i, i + 0x8000));
+  }
+  return btoa(str);
+};
+
 /* clay / silhouette debug view */
 window.__clay = () => {
   const clay = new THREE.MeshStandardMaterial({ color: 0xd6dade, roughness: 0.8, metalness: 0.02 });
@@ -526,7 +979,10 @@ window.__clay = () => {
   sky.visible = false;
   scene.fog = null;
   scene.background = new THREE.Color(0x0e1216);
-  grade.enabled = false;
+  cinematic.enabled = false;
+  fxaaPass.enabled = false;
+  ssaoPass.enabled = false;
+  dofPass.enabled = false;
   bloom.enabled = false;
   lights.sun.position.set(-0.4, 0.85, 0.35).multiplyScalar(400);
   lights.sun.intensity = 3.2;

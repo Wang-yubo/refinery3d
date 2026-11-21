@@ -256,6 +256,8 @@ export function bakeStatic(root) {
     const m = new THREE.Mesh(merged, mat);
     m.castShadow = true;
     m.receiveShadow = true;
+    m.userData.baked = true;
+    m.userData.bakeMaterial = mat.name || '';
     root.add(m);
     if (geos.length > 1) geos.forEach((g) => g.dispose());
   }

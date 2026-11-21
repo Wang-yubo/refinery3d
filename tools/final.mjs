@@ -16,7 +16,7 @@ page.on('pageerror', (e) => logs.push('[pageerror] ' + e.message));
 await page.goto('http://127.0.0.1:4321/?clean=1&shot=aerial', { waitUntil: 'domcontentloaded', timeout: 300000 });
 await page.waitForFunction('window.__ready === true', { timeout: 300000, polling: 300 });
 fs.mkdirSync('renders', { recursive: true });
-for (const name of (shots.length ? shots : ['aerial','hero','cdu','tanks','fcc','night','flow','top'])) {
+for (const name of (shots.length ? shots : ['aerial','hero','cdu','tanks','fcc','night','flow','day','top'])) {
   await page.evaluate((n) => window.__setShot(n), name);
   await new Promise(r => setTimeout(r, 800));
   const path = `renders/${name}.png`;
