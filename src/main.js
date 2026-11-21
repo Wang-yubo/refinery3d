@@ -14,6 +14,7 @@ import { createContactShadows } from './contacts.js';
 import { QUALITY_LEVELS, detectQuality } from './quality.js';
 import { SSAOPass, FXAAPass, CinematicPass, DepthOfFieldPass, createLuminanceMeter } from './postfx.js';
 import { loadPlantSnapshot } from './prebaked.js';
+import { BAKED_META } from './bakedMeta.js';
 
 const params = new URLSearchParams(location.search);
 const T0 = performance.now();
@@ -142,6 +143,7 @@ if (usePrebaked) {
     const snap = await loadPlantSnapshot(m, {
       jsonUrl: './assets/baked.json',
       binUrl: './assets/baked.bin',
+      meta: BAKED_META,
       onProgress: (p, text) => setLoading(text),
     });
     const tLoad = performance.now();

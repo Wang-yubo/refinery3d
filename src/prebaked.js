@@ -8,20 +8,23 @@ import * as THREE from 'three';
 export async function loadPlantSnapshot(materials, {
   jsonUrl = './assets/baked.json',
   binUrl = './assets/baked.bin',
+  meta: inlineMeta = null,
   onProgress = () => {},
 } = {}) {
   const t0 = performance.now();
   onProgress(0.05, '读取场景快照 …');
-  // 元数据与 20MB 几何并行下载，减少串行等待
-  const [metaRes, binRes] = await Promise.all([
-    fetch(jsonUrl, { cache: 'force-cache' }),
-    fetch(binUrl, { cache: 'force-cache' }),
-  ]);
-  if (!metaRes.ok) throw new Error(`snapshot meta ${metaRes.status}`);
-  if (!binRes.ok) throw new Error(`snapshot bin ${binRes.status}`);
-  const meta = await metaRes.json();
-  const tMeta = performance.now();
+  // 默认使用构建期内联的元数据（省一次请求）；缺失时再回退到 baked.json
+  let meta = inlineMeta;
+  let tMeta = t0;
+  if (!meta) {
+    const metaRes = await fetch(jsonUrl, { cache: 'force-cache' });
+    if (!metaRes.ok) throw new Error(`snapshot meta ${metaRes.status}`);
+    meta = await metaRes.json();
+    tMeta = performance.now();
+  }
   onProgress(0.18, '下载烘焙几何 …');
+  const binRes = await fetch(binUrl, { cache: 'force-cache' });
+  if (!binRes.ok) throw new Error(`snapshot bin ${binRes.status}`);
   const buffer = await binRes.arrayBuffer();
   const tBin = performance.now();
   if (buffer.byteLength !== meta.bytes) {

@@ -30,6 +30,8 @@ const meta = await page.evaluate(() => window.__buildSnapshot());
 const binPath = path.join(OUT, 'baked.bin');
 const jsonPath = path.join(OUT, 'baked.json');
 fs.writeFileSync(jsonPath, JSON.stringify(meta));
+// 同步生成内联元数据，运行时无需再请求 baked.json
+fs.writeFileSync(path.resolve('src/bakedMeta.js'), `// 由 tools/build-baked.mjs 自动生成：避免冷启动时再请求 10KB 元数据\nexport const BAKED_META = ${JSON.stringify(meta)};\n`);
 const chunkSize = 4 * 1024 * 1024;
 const chunks = Math.ceil(meta.bytes / chunkSize);
 const fd = fs.openSync(binPath, 'w');
