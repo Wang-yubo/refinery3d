@@ -10,9 +10,14 @@
   },
   "keywords": [],
   "author": "Wang-yubo",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "puppeteer-core": "^23.11.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wang-yubo/refinery3d.git"
+  },
+  "homepage": "https://github.com/Wang-yubo/refinery3d"
 }
