@@ -1,259 +1,259 @@
 {
-  "generated": "2026-11-21T18:09:11.228Z",
+  "generated": "2026-11-21T18:16:45.123Z",
   "cold": {
-    "wallToReady": 28.98,
-    "wallToFull": 42.05,
+    "wallToReady": 27.94,
+    "wallToFull": 40.01,
     "phases": {
       "marks": [
         {
           "name": "main-module",
-          "t": 1297.8,
-          "dt": 1297.8
+          "t": 1325.4,
+          "dt": 1325.4
         },
         {
           "name": "renderer",
-          "t": 2160.7,
-          "dt": 862.9
+          "t": 2094.3,
+          "dt": 768.9
         },
         {
           "name": "materials",
-          "t": 3175,
-          "dt": 1014.3
+          "t": 3156.6,
+          "dt": 1062.3
         },
         {
           "name": "snap-fetch-begin",
-          "t": 4048.3,
-          "dt": 873.3
+          "t": 4108.5,
+          "dt": 951.9
         },
         {
           "name": "snap-fetched",
-          "t": 5818.4,
-          "dt": 1770.1
+          "t": 5832.1,
+          "dt": 1723.6
         },
         {
           "name": "plant-prebaked",
-          "t": 7568.8,
-          "dt": 1750.4
+          "t": 8579.2,
+          "dt": 2747.1
         },
         {
           "name": "lights-start",
-          "t": 7570.4,
-          "dt": 1.6
+          "t": 8580.7,
+          "dt": 1.5
         },
         {
           "name": "lights-done",
-          "t": 8011.9,
-          "dt": 441.5
+          "t": 9232.7,
+          "dt": 652
         },
         {
           "name": "geometry-baked",
-          "t": 8012,
-          "dt": 0.1
-        },
-        {
-          "name": "contact-shadows",
-          "t": 8012,
+          "t": 9232.7,
           "dt": 0
         },
         {
+          "name": "contact-shadows",
+          "t": 9232.9,
+          "dt": 0.2
+        },
+        {
           "name": "anim-start",
-          "t": 8012,
+          "t": 9232.9,
           "dt": 0
         },
         {
           "name": "anim-blend-start",
-          "t": 8041.8,
-          "dt": 29.8
+          "t": 9251.9,
+          "dt": 19
         },
         {
           "name": "anim-blend-done",
-          "t": 9797,
-          "dt": 1755.2
+          "t": 10712.9,
+          "dt": 1461
         },
         {
           "name": "anim-streams-done",
-          "t": 12526.7,
-          "dt": 2729.7
+          "t": 12728.8,
+          "dt": 2015.9
         },
         {
           "name": "anim-rings-done",
-          "t": 12768,
-          "dt": 241.3
+          "t": 12895.3,
+          "dt": 166.5
         },
         {
           "name": "anim-spot-done",
-          "t": 12923.6,
-          "dt": 155.6
+          "t": 13034.4,
+          "dt": 139.1
         },
         {
           "name": "anim-smoke-done",
-          "t": 12923.8,
-          "dt": 0.2
+          "t": 13034.5,
+          "dt": 0.1
         },
         {
           "name": "anim-flame-done",
-          "t": 12975,
-          "dt": 51.2
+          "t": 13080.3,
+          "dt": 45.8
         },
         {
           "name": "anim-fans-done",
-          "t": 13282,
-          "dt": 307
+          "t": 13327.6,
+          "dt": 247.3
         },
         {
           "name": "anim-beacons-done",
-          "t": 13290.2,
-          "dt": 8.2
+          "t": 13338,
+          "dt": 10.4
         },
         {
           "name": "anim-trucks-done",
-          "t": 15503.6,
-          "dt": 2213.4
+          "t": 15262,
+          "dt": 1924
         },
         {
           "name": "anim-arms-done",
-          "t": 15844.8,
-          "dt": 341.2
+          "t": 15544,
+          "dt": 282
         },
         {
           "name": "anim-done",
-          "t": 16016.5,
-          "dt": 171.7
+          "t": 15707.6,
+          "dt": 163.6
         },
         {
           "name": "interact-start",
-          "t": 16016.5,
+          "t": 15707.6,
           "dt": 0
         },
         {
           "name": "interact-done",
-          "t": 16331.6,
-          "dt": 315.1
+          "t": 16021,
+          "dt": 313.4
         },
         {
           "name": "aq-start",
-          "t": 16331.7,
+          "t": 16021.1,
           "dt": 0.1
         },
         {
           "name": "apply-quality",
-          "t": 16337.9,
-          "dt": 6.2
+          "t": 16027.4,
+          "dt": 6.3
         },
         {
           "name": "set-shot-start",
-          "t": 16339.7,
-          "dt": 1.8
+          "t": 16029.1,
+          "dt": 1.7
         },
         {
           "name": "set-shot-done",
-          "t": 16419.4,
-          "dt": 79.7
+          "t": 16144.5,
+          "dt": 115.4
         },
         {
           "name": "boot-compile-start",
-          "t": 16419.4,
-          "dt": 0
+          "t": 16144.6,
+          "dt": 0.1
         },
         {
           "name": "boot-compile-done",
-          "t": 20759.9,
-          "dt": 4340.5
+          "t": 20263.8,
+          "dt": 4119.2
         },
         {
           "name": "first-render-start",
-          "t": 20760,
-          "dt": 0.1
-        },
-        {
-          "name": "first-render-done",
-          "t": 27277,
-          "dt": 6517
-        },
-        {
-          "name": "first-frame",
-          "t": 27277.1,
-          "dt": 0.1
-        },
-        {
-          "name": "ready",
-          "t": 28631.8,
-          "dt": 1354.7
-        },
-        {
-          "name": "full-decor-start",
-          "t": 30579.2,
-          "dt": 1947.4
-        },
-        {
-          "name": "full-decor-done",
-          "t": 30992.8,
-          "dt": 413.6
-        },
-        {
-          "name": "full-contact-start",
-          "t": 30992.8,
+          "t": 20263.8,
           "dt": 0
         },
         {
+          "name": "first-render-done",
+          "t": 26204.5,
+          "dt": 5940.7
+        },
+        {
+          "name": "first-frame",
+          "t": 26215.7,
+          "dt": 11.2
+        },
+        {
+          "name": "ready",
+          "t": 27601.6,
+          "dt": 1385.9
+        },
+        {
+          "name": "full-decor-start",
+          "t": 29169.1,
+          "dt": 1567.5
+        },
+        {
+          "name": "full-decor-done",
+          "t": 29494.5,
+          "dt": 325.4
+        },
+        {
+          "name": "full-contact-start",
+          "t": 29494.6,
+          "dt": 0.1
+        },
+        {
           "name": "full-contact-done",
-          "t": 31581.5,
-          "dt": 588.7
+          "t": 29879.3,
+          "dt": 384.7
         },
         {
           "name": "full-ground-start",
-          "t": 31581.5,
+          "t": 29879.3,
           "dt": 0
         },
         {
           "name": "full-ground-done",
-          "t": 31830.1,
-          "dt": 248.6
+          "t": 30245.3,
+          "dt": 366
         },
         {
           "name": "full-env-start",
-          "t": 31830.2,
+          "t": 30245.4,
           "dt": 0.1
         },
         {
           "name": "pmrem-start",
-          "t": 31830.4,
+          "t": 30245.6,
           "dt": 0.2
         },
         {
           "name": "pmrem-done",
-          "t": 35337.4,
-          "dt": 3507
+          "t": 33547.1,
+          "dt": 3301.5
         },
         {
           "name": "full-env-done",
-          "t": 35360.6,
-          "dt": 23.2
+          "t": 33572.6,
+          "dt": 25.5
         },
         {
           "name": "full-postfx-done",
-          "t": 35571.3,
-          "dt": 210.7
+          "t": 33778.7,
+          "dt": 206.1
         },
         {
           "name": "full-quality-done",
-          "t": 35610.1,
-          "dt": 38.8
+          "t": 33817.3,
+          "dt": 38.6
         },
         {
           "name": "full-look-done",
-          "t": 35677.6,
-          "dt": 67.5
+          "t": 33897.8,
+          "dt": 80.5
         },
         {
           "name": "full-render-done",
-          "t": 41698.3,
-          "dt": 6020.7
+          "t": 39676.4,
+          "dt": 5778.6
         }
       ],
       "gl": null,
       "programs": null,
-      "now": 45823.5
+      "now": 43453.5
     },
     "renderInfo": {
       "programs": 37,
@@ -522,8 +522,8 @@
             "tankTruck",
             "trunk",
             "roadLine",
-            "ab3f540d-9611-443d-8fd3-19e4dd531ce3",
-            "385b14d7-ee97-4cc4-98bf-830859366b2d"
+            "3944a2bf-db78-471c-bbf8-258aa0c9f5f2",
+            "627298ee-2d09-46cd-9387-f25170553011"
           ],
           "meshes": 294,
           "visible": 294
@@ -548,19 +548,19 @@
         {
           "key": "MeshBasicMaterial+transparent+doubleSide+additive",
           "materials": [
-            "90e7032d-95ec-4daf-a367-4139765909cf",
-            "44044735-b38c-484a-806c-e27658915a84",
-            "c1551c67-c85e-4fe2-ad43-935ecc1284d8",
-            "078e103d-600d-47e0-ae4f-a09f9cfa7c8d",
-            "1c1f6862-477e-4887-9806-fdb6f1c1487b",
-            "231f8069-2771-4d6a-a06d-bc927a3e2edc",
-            "63ebbf8b-50f8-44ad-be1c-d03348a3adfd",
-            "507223c8-236a-49e4-860e-0d35a5d5ca5e",
-            "b42d637e-48ef-4e0e-b8b0-b5d905287266",
-            "04db53e9-52e3-4a97-abf9-761b5f8c6111",
-            "ba1ea592-a000-45bb-bdc7-f0423553cf57",
-            "66251c9c-d877-4356-b1a6-812fd371b3c4",
-            "32d0d315-a45b-40d3-b3a6-77065801a465"
+            "6dee28c8-000e-4f28-997f-1f9923078470",
+            "7d0d520c-8086-4b57-bd4e-250d5853e874",
+            "83ca3485-4ae1-42b4-9e3d-9f6d5a2a55ea",
+            "4f0c66fa-c455-4fc5-90c0-73347dcda894",
+            "22bbc3db-fe94-46ff-8b78-a29208e84212",
+            "58ba4e59-f9fd-46a5-b4a4-19793978c8c6",
+            "af58b412-a428-4063-8ec6-eeb8de994807",
+            "efa5da3d-c2cf-46e8-af72-e8a2593a5118",
+            "93386f94-9a81-4be9-8dca-05a82a8cae10",
+            "4da7f163-22fc-4957-b3ab-679e36277f75",
+            "795e1298-b18e-42b3-bbe2-f75ec5834404",
+            "5b7d048f-7dd3-47f4-a44c-3417a5d33b62",
+            "18596189-0e74-4378-b2c2-368213fff401"
           ],
           "meshes": 13,
           "visible": 12
@@ -568,14 +568,14 @@
         {
           "key": "MeshBasicMaterial+transparent",
           "materials": [
-            "172afe63-b63f-41da-aac6-aba228c09423",
-            "8d5729ab-9a07-4f19-8384-c6376718eaaa",
-            "3de55a88-3c0c-45c8-bd63-0ddfd2032435",
-            "83316ad3-4122-4fac-952a-a59f62bb0d14",
-            "bdd8b934-074b-45a2-afae-e7cd6c9befae",
-            "5cab6016-e696-4fc4-a64d-f97fe5aa0048",
-            "43557983-ae30-4e9b-9bcd-1676848ae232",
-            "e816a9e3-c03f-493f-90f5-99e60df58b87"
+            "1ad4ca4a-ca36-482e-8a2c-b1f210dd4e3a",
+            "e4ca983f-4f00-46fe-a643-5a4d5402bca6",
+            "bfcc5625-95ec-4284-9c72-dbff99d62f32",
+            "760f6a77-381d-4a21-a2f1-d76e4ee80651",
+            "5a8f7d4f-a238-4736-a7ee-efcb12749f24",
+            "5d92e481-3884-4810-945b-f6bd73ddc298",
+            "126220aa-ef68-4c56-8092-8f9d9033548f",
+            "57d62d5f-bee5-4ea4-9e00-43b14cb4602c"
           ],
           "meshes": 8,
           "visible": 8
@@ -583,14 +583,14 @@
         {
           "key": "MeshBasicMaterial",
           "materials": [
-            "caeac924-f485-419a-a14f-2bd8b14b8e33",
-            "1094b634-3881-43e2-b2fd-eba50902dd26",
-            "7edb569a-8baa-4dbd-a795-00e084fe105c",
-            "eb7cfd21-a419-480f-ad05-225805767875",
-            "43a4aa1d-eb8d-4580-ac4b-7c40c3cb16ca",
-            "86ce77df-c522-4142-ba50-fca6850444c4",
-            "8073f10f-39e5-4855-be3e-0d86527b53cf",
-            "72641dc3-c8a3-453d-a800-c3bf480dc01d"
+            "d13b389f-38b3-403b-974d-d74895dd5271",
+            "20b887e8-a100-41b6-93ed-49bec9bc1e3b",
+            "423846b7-ebaf-4831-bf66-d29b2330017d",
+            "230dcc6b-6c02-45e3-9928-09e598ae809a",
+            "ac5abe5d-1f1d-41ce-b9f8-98a76c20e188",
+            "3be9f985-851d-468d-92c7-e3a540f90f45",
+            "61ebc51f-22b2-4ee5-8cb6-901531142c01",
+            "3f7218c3-4820-48c9-b9f7-63e6a11b3d49"
           ],
           "meshes": 8,
           "visible": 8
@@ -598,12 +598,12 @@
         {
           "key": "ShaderMaterial+transparent+doubleSide+shader+additive",
           "materials": [
-            "28c65901-2862-4211-983e-52e449e5c106",
-            "3611ef63-5be6-4cc0-b4aa-12c0f0128051",
-            "48a28250-fbe1-4127-8e12-9d23d91a5ff9",
-            "209e48d3-3f1b-407f-ae03-959870454bb9",
-            "91335a24-08bc-4f47-9869-c4dabc172499",
-            "12238e3c-b39f-467c-b928-38c62ac09303"
+            "bdcf8e73-3378-4fd3-b5f6-a2419348c3cf",
+            "393c6975-ab47-4b8a-a842-def2aa00d79e",
+            "a742d99d-a1f4-4d9d-bb1e-ebf3c514a0a5",
+            "c77ddd12-b38e-49e7-a6ad-84b10eb46a0b",
+            "458c12da-f278-4d89-a989-8fdcd2202ed0",
+            "39f44463-5f88-4cde-9fc9-5e20b9e09c91"
           ],
           "meshes": 6,
           "visible": 6
@@ -611,12 +611,12 @@
         {
           "key": "ShaderMaterial+transparent+shader+additive",
           "materials": [
-            "7aa0f195-746b-4b0e-8fec-3e3510d841d0",
-            "9a779aca-079e-4017-bfb4-525dd10fc348",
-            "512ead0c-057c-42a8-a9d6-86a25cfa48ef",
-            "b22b08c3-7bac-4637-9b68-d35badc68666",
-            "13819950-d137-44af-bcff-c5d525766591",
-            "7a8f79c4-7e13-453a-a9ca-b431df265db6"
+            "dc400177-e5b9-4287-8d36-d07fa52a5503",
+            "88d72d5c-8591-4813-b4b2-d8fb25a6c22d",
+            "4a693531-e166-4f4d-b386-ec7de11dbdc3",
+            "38c5b0c9-d11d-403d-a0bf-09d82035e481",
+            "5fbc41f3-725b-498a-a3e8-78469b62b472",
+            "70062650-17e0-421b-af9b-8ae3c227f6c2"
           ],
           "meshes": 6,
           "visible": 6
@@ -642,7 +642,7 @@
         {
           "key": "ShaderMaterial+shader",
           "materials": [
-            "90963d64-6cec-43f7-a33f-68dbc5670fb6"
+            "85e2cb42-05b8-4550-9b18-3d4a28b32bf9"
           ],
           "meshes": 1,
           "visible": 1
@@ -666,7 +666,7 @@
         {
           "key": "LineBasicMaterial+transparent",
           "materials": [
-            "85b17c65-74f0-4f88-8a92-c64f91a5b08c"
+            "023d35ad-48cc-4c50-9662-ff2488ec2a28"
           ],
           "meshes": 1,
           "visible": 0
@@ -674,7 +674,7 @@
         {
           "key": "MeshBasicMaterial+map+transparent+vcolors",
           "materials": [
-            "ab2cb3bb-fdca-431f-8cec-fac89b392d2d"
+            "cee0c190-6357-42a0-b327-fd36b0cdf2e3"
           ],
           "meshes": 1,
           "visible": 1
@@ -702,7 +702,7 @@
       "mean": 115.5,
       "clipPct": 0,
       "perf": {
-        "fps": 56.1,
+        "fps": 54.9,
         "calls": 671,
         "triangles": 1045837,
         "quality": "low",
@@ -739,7 +739,7 @@
         0
       ],
       "perf": {
-        "fps": 29.5,
+        "fps": 25.2,
         "calls": 688,
         "triangles": 1045949,
         "quality": "high",
@@ -769,16 +769,16 @@
         8.3,
         5.7,
         18.8,
-        18.4,
-        12.8,
-        3.4,
+        18.5,
+        12.7,
+        3.5,
         0.9,
         0.2,
         0,
         0
       ],
       "perf": {
-        "fps": 36,
+        "fps": 28,
         "calls": 588,
         "triangles": 1044538,
         "quality": "high",
@@ -795,18 +795,18 @@
       "delta": -2
     },
     "cdu": {
-      "mean": 113.2,
+      "mean": 113.1,
       "darkPct": 0.1,
       "clipPct": 0,
       "hist": [
         0.3,
         3,
-        3.5,
+        3.6,
         8.8,
         6.6,
         15.4,
         11.3,
-        9.5,
+        9.6,
         13.5,
         13.1,
         11.2,
@@ -817,13 +817,13 @@
         0
       ],
       "perf": {
-        "fps": 35,
+        "fps": 35.5,
         "calls": 264,
         "triangles": 1031977,
         "quality": "high",
         "pixelRatio": 1,
-        "measuredLuma": 0.447,
-        "exposure": 0.905,
+        "measuredLuma": 0.445,
+        "exposure": 0.903,
         "ao": true,
         "dof": true,
         "fxaa": true,
@@ -831,7 +831,7 @@
         "postfx": true
       },
       "refMean": 113,
-      "delta": 0.2
+      "delta": 0.1
     }
   },
   "gl": {},
@@ -841,7 +841,7 @@
       "mean": 115.5,
       "clipPct": 0,
       "perf": {
-        "fps": 59.9,
+        "fps": 60,
         "calls": 671,
         "triangles": 1045837,
         "quality": "low",
@@ -855,21 +855,21 @@
         "postfx": true
       }
     },
-    "medium": {
-      "mean": 117.3,
+    "mid": {
+      "mean": 115.6,
       "clipPct": 0,
       "perf": {
-        "fps": 60,
-        "calls": 671,
-        "triangles": 1045837,
-        "quality": "low",
+        "fps": 45.1,
+        "calls": 686,
+        "triangles": 1045947,
+        "quality": "mid",
         "pixelRatio": 1,
-        "measuredLuma": 0.208,
-        "exposure": 0.925,
+        "measuredLuma": 0.207,
+        "exposure": 0.9,
         "ao": false,
         "dof": false,
-        "fxaa": false,
-        "bloom": false,
+        "fxaa": true,
+        "bloom": true,
         "postfx": true
       }
     },
@@ -877,12 +877,12 @@
       "mean": 115.6,
       "clipPct": 0,
       "perf": {
-        "fps": 38.5,
+        "fps": 36.2,
         "calls": 688,
         "triangles": 1045949,
         "quality": "high",
         "pixelRatio": 1,
-        "measuredLuma": 0.208,
+        "measuredLuma": 0.207,
         "exposure": 0.9,
         "ao": true,
         "dof": true,
@@ -901,7 +901,7 @@
       "speed": 1,
       "stage": 0,
       "stageElapsed": 0,
-      "time": 15.51,
+      "time": 15.08,
       "streams": [
         {
           "id": "crude",
