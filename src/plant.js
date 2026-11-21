@@ -452,8 +452,7 @@ function createPipeCorridor(m) {
   return g;
 }
 
-function createLabels(m) {
-  const g = new THREE.Group();
+function createLabels(m, g = new THREE.Group()) {
   g.name = 'labels';
   const items = [
     { t: '原油罐区', s: 'Crude Oil Storage', p: [-172, 46, 6], a: [-165, 22, 0] },
@@ -476,8 +475,7 @@ function createLabels(m) {
   return g;
 }
 
-function createNightGlow(m) {
-  const g = new THREE.Group();
+function createNightGlow(m, g = new THREE.Group()) {
   g.name = 'nightglow';
   const add = (x, y, z, size = 5, opacity = 0.8, color = 0xffc27a) => {
     const s = makeGlow(m.glowTex, color, size, opacity);
@@ -560,12 +558,14 @@ function createSteamDecor(m) {
   return g;
 }
 
-export function createPlantDecor(m) {
-  const root = new THREE.Group();
+export function createPlantDecor(m, target = null) {
+  // target：冷启动时先用空 group 占位（动画 / 交互已持有引用），首帧后再填充内容
+  const root = target?.root || new THREE.Group();
   root.name = 'plant-decor';
-  const labels = createLabels(m);
-  const nightGlow = createNightGlow(m);
-  root.add(labels, nightGlow, createSteamDecor(m));
+  const labels = createLabels(m, target?.labels);
+  const nightGlow = createNightGlow(m, target?.nightGlow);
+  if (!target) root.add(labels, nightGlow);
+  root.add(createSteamDecor(m));
   // 控制室玻璃幕墙在 bakeStatic 中因 transparent 被跳过，快照模式需补回
   root.add(box(24, 8, 13, m.glass, -80, 4.4, 148));
   const flame = createFlareFlame(m, { h: 74 });

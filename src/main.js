@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createMaterials } from './materials.js';
-import { createSky, createLights, createGround, createHills, applyPreset, PRESETS } from './environment.js';
+import { createSky, createLights, createGround, createGroundLite, createHills, applyPreset, PRESETS } from './environment.js';
 import { createPlant, createPlantDecor } from './plant.js';
 import { bakeStatic } from './helpers.js';
 import { createAnimation } from './animation.js';
@@ -13,12 +13,14 @@ import { createInteraction } from './interaction.js';
 import { createContactShadows } from './contacts.js';
 import { QUALITY_LEVELS, detectQuality } from './quality.js';
 import { SSAOPass, FXAAPass, CinematicPass, DepthOfFieldPass, createLuminanceMeter } from './postfx.js';
-import { loadPlantSnapshot } from './prebaked.js';
+import { fetchSnapshot, buildSnapshot } from './prebaked.js';
 import { BAKED_META } from './bakedMeta.js';
+import { mark, marksList, instrumentGL, glSummary, programTimings } from './prof.js';
 
 const params = new URLSearchParams(location.search);
 const T0 = performance.now();
-const mark = (label) => console.log(`[timing] ${label} ${((performance.now() - T0) / 1000).toFixed(1)}s`);
+const tlog = (label) => console.log(`[timing] ${label} ${((performance.now() - T0) / 1000).toFixed(1)}s`);
+mark('main-module');
 const isClean = params.get('clean') === '1';
 if (isClean) document.body.classList.add('clean');
 
@@ -45,6 +47,11 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 /* 关闭 autoReset，让 __perf() 统计整帧所有 pass 的 draw call */
 renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
+mark('renderer');
+const PROFILE = params.get('profile') === '1';
+if (PROFILE) {
+  try { instrumentGL(renderer.getContext()); } catch (e) { console.warn('[profile] GL hook failed', e); }
+}
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xb3907c, 0.002);
@@ -65,7 +72,7 @@ controls.maxDistance = 1400;
 /* ------------------------------------------------------------------ */
 const m = createMaterials();
 Object.entries(m).forEach(([name, mat]) => { if (mat && mat.isMaterial) mat.name = name; });
-mark('materials');
+tlog('materials'); mark('materials');
 const { sky, uniforms: skyUniforms } = createSky();
 scene.add(sky);
 const lights = createLights();
@@ -80,13 +87,16 @@ const envSky = new THREE.Mesh(new THREE.SphereGeometry(40, 48, 32), sky.material
 envScene.add(envSky);
 const envCache = new Map();
 let pmremKey = '';
+let envMapReady = false;
 
 function rebuildEnvironment(presetKey) {
   if (presetKey === pmremKey) return;
   pmremKey = presetKey;
   let env = envCache.get(presetKey);
   if (!env) {
+    mark('pmrem-start');
     env = pmrem.fromScene(envScene, 0.02, 0.1, 100).texture;
+    mark('pmrem-done');
     env.name = 'pmrem-' + presetKey;
     envCache.set(presetKey, env);
   }
@@ -123,38 +133,85 @@ function applyMaterialEnv(presetKey = 'dusk') {
   }
 }
 
-const ground = createGround(m);
-ground.name = 'ground';
-scene.add(ground);
-scene.add(createHills(m));
+/**
+ * 首帧前的渲染预热：用一个极小的 probe 场景（每种材质一个 cube + 同一套灯光）
+ * 走一遍 compile + draw，把 program 生成、uniform 定位、draw 代码路径的一次性
+ * 开销提前支付，并与快照下载重叠。probe 渲染到 64×64 RT，不影响画面。
+ */
+function warmupRenderer() {
+  const probe = new THREE.Scene();
+  probe.fog = scene.fog;
+  const geo = new THREE.BoxGeometry(2, 2, 2);
+  const seen = new Set();
+  for (const mat of Object.values(m)) {
+    if (!mat || !mat.isMaterial || mat.isSpriteMaterial || seen.has(mat)) continue;
+    seen.add(mat);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    probe.add(mesh);
+  }
+  probe.add(new THREE.Mesh(new THREE.BoxGeometry(60, 60, 60), sky.material));
+  const sun = lights.sun.clone();
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(256, 256);
+  probe.add(sun, sun.target);
+  probe.add(lights.hemi.clone(), lights.ambient.clone(), lights.fill.clone());
+
+  const rt = new THREE.WebGLRenderTarget(64, 64);
+  const cam = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+  cam.position.set(0, 0, 8);
+  cam.lookAt(0, 0, 0);
+  renderer.setRenderTarget(rt);
+  renderer.render(probe, cam);
+  renderer.setRenderTarget(null);
+  rt.dispose();
+}
 
 /* 冷启动：默认读取构建期烘焙快照；?procedural=1 回退到实时建模 */
 const usePrebaked = params.get('procedural') !== '1' && params.get('prebaked') !== '0';
+/* 先把快照下载挂起（与后续建模 / 着色器预热并行），再在需要时 await */
+const snapshotPromise = usePrebaked ? fetchSnapshot({
+  binUrl: './assets/baked.bin',
+  gzUrl: './assets/baked.bin.gz',
+}).catch((err) => { console.warn('[prebaked] 下载失败：', err.message); return null; }) : Promise.resolve(null);
+mark('snap-fetch-begin');
+
+/* 轻量地面：完整地面 + 烘焙 + 远山推迟到 full 阶段（headless 下约 3–6s） */
+const groundLite = createGroundLite(m);
+scene.add(groundLite);
 let plant = null;
 let labels = null;
 let nightGlow = null;
 let usingPrebaked = false;
+let decorTarget = null;
 const loadingEl = document.getElementById('loading');
 const setLoading = (text) => { if (loadingEl) loadingEl.textContent = text; };
 
 if (usePrebaked) {
   try {
     const tSnap = performance.now();
-    const snap = await loadPlantSnapshot(m, {
-      jsonUrl: './assets/baked.json',
-      binUrl: './assets/baked.bin',
-      meta: BAKED_META,
-      onProgress: (p, text) => setLoading(text),
-    });
+    const buffer = await snapshotPromise;
+    if (!buffer) throw new Error('snapshot download failed');
+    mark('snap-fetched');
+    const snap = buildSnapshot(buffer, BAKED_META, m, { onProgress: (p, text) => setLoading(text) });
     const tLoad = performance.now();
     plant = snap.root;
-    const decor = createPlantDecor(m);
-    plant.add(decor.root);
-    labels = decor.labels;
-    nightGlow = decor.nightGlow;
+    /* 装饰（~150 个 sprite / 标签 / 蒸汽）延后到完整画质阶段创建：
+     * 首帧少 1.2s 的 canvas 纹理生成与 ~150 个 draw call */
+    labels = new THREE.Group();
+    labels.name = 'labels';
+    labels.visible = false;
+    nightGlow = new THREE.Group();
+    nightGlow.name = 'nightglow';
+    nightGlow.visible = false;
+    const decorRoot = new THREE.Group();
+    decorRoot.name = 'plant-decor';
+    plant.add(decorRoot, labels, nightGlow);
+    decorTarget = { root: decorRoot, labels, nightGlow };
     usingPrebaked = true;
     console.log(`[snapshot] load ${((tLoad - tSnap) / 1000).toFixed(1)}s decor ${((performance.now() - tLoad) / 1000).toFixed(1)}s`);
-    mark(`plant prebaked ${(snap.bytes / 1048576).toFixed(1)}MB/${snap.vertexCount} verts`);
+    tlog(`plant prebaked ${(snap.bytes / 1048576).toFixed(1)}MB/${snap.vertexCount} verts`); mark('plant-prebaked');
   } catch (err) {
     console.warn('[prebaked] 快照不可用，回退实时建模：', err.message);
   }
@@ -164,11 +221,12 @@ if (!plant) {
   plant = built.root;
   labels = built.labels;
   nightGlow = built.nightGlow;
-  mark('plant built');
+  tlog('plant built'); mark('plant-built');
 }
 scene.add(plant);
 window.__prebaked = usingPrebaked;
 
+mark('lights-start');
 // night point lights
 const nightLights = [];
 for (const [x, y, z, color, dist] of [
@@ -195,38 +253,53 @@ for (const [x, y, z, color, dist] of [
 /* ------------------------------------------------------------------ */
 /* post processing                                                     */
 /* ------------------------------------------------------------------ */
-const size = new THREE.Vector2(innerWidth, innerHeight);
-const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, {
-  type: THREE.HalfFloatType,
-  samples: 4,
-});
-/* AO / DOF 需要 RenderPass 的深度；composer 的缓冲都会带 depthTexture */
-const depthTexture = new THREE.DepthTexture(innerWidth, innerHeight);
-depthTexture.type = THREE.UnsignedIntType;
-rt.depthTexture = depthTexture;
-const composer = new EffectComposer(renderer, rt);
-composer.setPixelRatio(renderer.getPixelRatio());
-const renderPass = new RenderPass(scene, camera);
-composer.addPass(renderPass);
+/* 后处理链延迟构建：EffectComposer / 各 pass 的全分辨率 RT 分配在 headless 下要好几秒，
+ * 把它们移出「首帧可交互」关键路径，等轻量首帧上屏后再异步补齐。 */
+let composer = null;
+let renderPass = null;
+let dofPass = null;
+let ssaoPass = null;
+let bloom = null;
+let outputPass = null;
+let cinematic = null;
+let fxaaPass = null;
+let postReady = false;
 
-const dofPass = new DepthOfFieldPass(camera, composer.readBuffer.depthTexture, { maxBlur: 8.0 });
-dofPass.enabled = false;
-composer.addPass(dofPass);
+function buildPostFX() {
+  if (postReady) return;
+  const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, {
+    type: THREE.HalfFloatType,
+    samples: 4,
+  });
+  /* AO / DOF 需要 RenderPass 的深度；composer 的缓冲都会带 depthTexture */
+  const depthTexture = new THREE.DepthTexture(innerWidth, innerHeight);
+  depthTexture.type = THREE.UnsignedIntType;
+  rt.depthTexture = depthTexture;
+  composer = new EffectComposer(renderer, rt);
+  composer.setPixelRatio(renderer.getPixelRatio());
+  renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
 
-const ssaoPass = new SSAOPass(camera, composer.readBuffer.depthTexture, { radius: 1.05, intensity: 0.58, bias: 0.04 });
-ssaoPass.enabled = false;
-composer.addPass(ssaoPass);
+  dofPass = new DepthOfFieldPass(camera, composer.readBuffer.depthTexture, { maxBlur: 8.0 });
+  dofPass.enabled = false;
+  composer.addPass(dofPass);
 
-const bloom = new UnrealBloomPass(size.clone(), 0.55, 0.7, 0.82);
-composer.addPass(bloom);
-const outputPass = new OutputPass();
-composer.addPass(outputPass);
+  ssaoPass = new SSAOPass(camera, composer.readBuffer.depthTexture, { radius: 1.05, intensity: 0.58, bias: 0.04 });
+  ssaoPass.enabled = false;
+  composer.addPass(ssaoPass);
 
-const cinematic = new CinematicPass();
-composer.addPass(cinematic);
+  bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.7, 0.82);
+  composer.addPass(bloom);
+  outputPass = new OutputPass();
+  composer.addPass(outputPass);
 
-const fxaaPass = new FXAAPass();
-composer.addPass(fxaaPass);
+  cinematic = new CinematicPass();
+  composer.addPass(cinematic);
+
+  fxaaPass = new FXAAPass();
+  composer.addPass(fxaaPass);
+  postReady = true;
+  }
 
 /* 曝光自适应：16x16 亮度采样，每 2s 更新一次，幅度 ±8% */
 const lumaMeter = createLuminanceMeter();
@@ -253,7 +326,7 @@ function updateDofState() {
     want = quality === 'high' && !labels.visible && !interacting &&
       (dofHold > 0 || (anim?.isActive?.() && anim.state.cruise === true));
   }
-  dofPass.enabled = !!want;
+  if (dofPass) dofPass.enabled = !!want;
 }
 
 /* ------------------------------------------------------------------ */
@@ -273,7 +346,7 @@ function updateStatsDom() {
   if (!statsEl || !statsVisible) return;
   statsEl.textContent =
     `${perf.fps.toFixed(0)} FPS  ·  ${perf.calls} calls  ·  ${(perf.triangles / 1000).toFixed(0)}k tris\n` +
-    `${quality.toUpperCase()}  ·  dpr ${renderer.getPixelRatio().toFixed(2)}  ·  AO ${ssaoPass.enabled ? 'on' : 'off'}`;
+    `${quality.toUpperCase()}  ·  dpr ${renderer.getPixelRatio().toFixed(2)}  ·  AO ${ssaoPass && ssaoPass.enabled ? 'on' : 'off'}`;
 }
 
 function updateQualityButton() {
@@ -287,27 +360,38 @@ function setShadowMapSize() {
   renderer.shadowMap.needsUpdate = true;
 }
 
-function applyQuality(level, { announce = false } = {}) {
+function applyQuality(level, { announce = false, boot = false } = {}) {
   if (!QUALITY_LEVELS[level]) return false;
   quality = level;
   Q = QUALITY_LEVELS[level];
   window.__quality = quality;
 
-  const pr = Math.min(window.devicePixelRatio || 1, Q.pixelRatio);
+  /* boot：轻量首帧用 DPR 1 + 256 阴影贴图，先保证可交互；完整档位随后补齐 */
+  const pr = boot ? 1 : Math.min(window.devicePixelRatio || 1, Q.pixelRatio);
   renderer.setPixelRatio(pr);
-  composer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
-  composer.setSize(innerWidth, innerHeight);
+  if (composer) { composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight); }
 
   renderer.shadowMap.enabled = Q.shadows;
-  setShadowMapSize();
-  bloom.enabled = Q.bloom;
-  bloom.strength = currentPreset.bloom.strength * Q.bloomScale;
-  ssaoPass.enabled = Q.ao;
-  contactShadows.visible = Q.contactShadows;
-  fxaaPass.enabled = Q.fxaa;
+  if (boot) {
+    // 轻量首帧：不渲染阴影贴图（省掉一次全场景 depth pass），只保留 shadow define 以复用 program
+    const sh = lights.sun.shadow;
+    sh.mapSize.set(256, 256);
+    if (sh.map) { sh.map.dispose(); sh.map = null; }
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = false;
+  } else {
+    renderer.shadowMap.autoUpdate = true;
+    setShadowMapSize();
+  }
+  if (bloom) {
+    bloom.enabled = Q.bloom;
+    bloom.strength = currentPreset.bloom.strength * Q.bloomScale;
+  }
+  if (ssaoPass) ssaoPass.enabled = Q.ao;
+  if (fxaaPass) fxaaPass.enabled = Q.fxaa;
+  if (contactShadows) contactShadows.visible = Q.contactShadows;
   if (!Q.dof) dofHold = 0;
-  if (!Q.contactShadows) contactShadows.visible = false;
 
   nightLights.forEach((l, i) => { l.visible = currentPreset.stars > 0.3 && i < Q.pointLights; });
   nightGlow.visible = currentPreset.stars > 0.3;
@@ -391,7 +475,7 @@ function applyLook(p) {
   currentPreset = p;
   currentPresetKey = Object.keys(PRESETS).find((k) => PRESETS[k] === p) || 'dusk';
   applyPreset(p, { skyUniforms, lights, scene, renderer });
-  rebuildEnvironment(currentPresetKey);
+  if (envMapReady) rebuildEnvironment(currentPresetKey);
   applyMaterialEnv(currentPresetKey);
 
   // emissive tuning
@@ -401,9 +485,11 @@ function applyLook(p) {
   m.beacon.emissiveIntensity = p.stars > 0.3 ? 7 : 2;
   m.flame.opacity = p.stars > 0.3 ? 1.0 : 0.9;
 
-  bloom.strength = p.bloom.strength * Q.bloomScale;
-  bloom.radius = p.bloom.radius;
-  bloom.threshold = p.bloom.threshold;
+  if (bloom) {
+    bloom.strength = p.bloom.strength * Q.bloomScale;
+    bloom.radius = p.bloom.radius;
+    bloom.threshold = p.bloom.threshold;
+  }
 
   baseExposure = p.exposure * 0.90;
   exposureScale = 1.0;
@@ -524,22 +610,21 @@ if (!isClean) {
   });
 }
 
+mark('lights-done');
 /* ------------------------------------------------------------------ */
 /* bake static geometry, then render                                   */
 /* ------------------------------------------------------------------ */
 if (!usingPrebaked) bakeStatic(plant);
-bakeStatic(ground);
-mark('geometry baked');
+mark('geometry-baked');
 
-/* 接触阴影在 bake 之后加入，避免被合并进静态几何 */
-const contactShadows = createContactShadows();
-contactShadows.visible = Q.contactShadows;
-scene.add(contactShadows);
-mark('contact shadows');
+/* 接触阴影用 canvas 生成（headless 下约 1s）→ 推迟到 full 阶段 */
+let contactShadows = null;
+tlog('contact shadows'); mark('contact-shadows');
 
 /* ------------------------------------------------------------------ */
 /* 工艺流程动画（在 bakeStatic 之后创建，避免被合并）                     */
 /* ------------------------------------------------------------------ */
+mark('anim-start');
 const anim = createAnimation({
   scene,
   camera,
@@ -550,6 +635,7 @@ const anim = createAnimation({
   setLook: (key) => applyLook(PRESETS[key] || PRESETS.dusk),
   isNight: () => currentPreset.stars > 0.3,
 });
+mark('anim-done');
 anim.onModeChange = (on) => {
   if (on) {
     syncBar('process');
@@ -561,6 +647,7 @@ anim.onModeChange = (on) => {
 /* ------------------------------------------------------------------ */
 /* 设备交互（在 bakeStatic 之后创建不可见拾取代理）                       */
 /* ------------------------------------------------------------------ */
+mark('interact-start');
 interact = createInteraction({
   scene, camera, controls, renderer, anim, labels,
   onFocus: () => {
@@ -574,8 +661,11 @@ interact = createInteraction({
   },
 });
 
-/* 初始应用一次档位（此时 anim / contactShadows 已就绪） */
-applyQuality(quality, { announce: false });
+mark('interact-done');
+/* 初始应用一次档位（此时 anim / contactShadows 已就绪）；boot 模式只保证可交互 */
+mark('aq-start');
+applyQuality(quality, { announce: false, boot: true });
+mark('apply-quality');
 
 /* 交互拖拽时关闭景深，避免卡顿 */
 controls.addEventListener('start', () => {
@@ -595,22 +685,27 @@ function renderStats() {
 }
 
 function render() {
-  cinematic.material.uniforms.uTime.value = anim.time;
-  cinematic.material.uniforms.uExposure.value = 1.0;
+  if (cinematic) {
+    cinematic.material.uniforms.uTime.value = anim.time;
+    cinematic.material.uniforms.uExposure.value = 1.0;
+  }
   sky.position.copy(camera.position);
 
-  // RenderPass 的目标会因 pass 开关在 rt1/rt2 之间切换，每帧绑定当前深度
-  const depth = composer.readBuffer.depthTexture;
-  if (depth) {
-    dofPass.depthTexture = depth;
-    dofPass.material.uniforms.tDepth.value = depth;
-    ssaoPass.depthTexture = depth;
-    ssaoPass.material.uniforms.tDepth.value = depth;
-  }
-  if (dofPass.enabled) dofPass.setFocus(camera.position.distanceTo(controls.target));
-
   renderer.info.reset();
-  composer.render();
+  if (postReady) {
+    // RenderPass 的目标会因 pass 开关在 rt1/rt2 之间切换，每帧绑定当前深度
+    const depth = composer.readBuffer.depthTexture;
+    if (depth) {
+      dofPass.depthTexture = depth;
+      dofPass.material.uniforms.tDepth.value = depth;
+      ssaoPass.depthTexture = depth;
+      ssaoPass.material.uniforms.tDepth.value = depth;
+    }
+    if (dofPass.enabled) dofPass.setFocus(camera.position.distanceTo(controls.target));
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
   perf.calls = renderer.info.render.calls;
   perf.triangles = renderer.info.render.triangles;
 }
@@ -657,7 +752,7 @@ function animate() {
     lumaTimer += dt;
     if (lumaTimer >= 2) {
       lumaTimer = 0;
-      measuredLuma = lumaMeter.sample(renderer, composer.readBuffer.texture);
+      if (postReady) measuredLuma = lumaMeter.sample(renderer, composer.readBuffer.texture);
       const target = TARGET_LUMA[currentPresetKey] ?? TARGET_LUMA.default;
       if (measuredLuma > 0.03 && measuredLuma < 0.9) {
         const ratio = THREE.MathUtils.clamp(target / measuredLuma, 0.92, 1.08);
@@ -673,6 +768,7 @@ function onResize() {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  if (!postReady) return;
   composer.setSize(innerWidth, innerHeight);
   bloom.setSize(innerWidth, innerHeight);
   dofPass.setSize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
@@ -701,10 +797,11 @@ window.__perf = () => ({
   pixelRatio: +renderer.getPixelRatio().toFixed(2),
   measuredLuma: +measuredLuma.toFixed(3),
   exposure: +renderer.toneMappingExposure.toFixed(3),
-  ao: ssaoPass.enabled,
-  dof: dofPass.enabled,
-  fxaa: fxaaPass.enabled,
-  bloom: bloom.enabled,
+  ao: !!(ssaoPass && ssaoPass.enabled),
+  dof: !!(dofPass && dofPass.enabled),
+  fxaa: !!(fxaaPass && fxaaPass.enabled),
+  bloom: !!(bloom && bloom.enabled),
+  postfx: postReady,
 });
 window.__bench = (n = 30) => {
   render();
@@ -712,6 +809,226 @@ window.__bench = (n = 30) => {
   for (let i = 0; i < n; i++) render();
   return { frames: n, msPerFrame: +((performance.now() - t) / n).toFixed(2), fps: +(1000 / ((performance.now() - t) / n)).toFixed(1) };
 };
+/* ------------------------------------------------------------------ */
+/* 完整画质升级：首帧之后异步补齐环境反射 / 后处理 / 全分辨率               */
+/* ------------------------------------------------------------------ */
+let fullReady = false;
+
+async function upgradeToFull() {
+  if (fullReady) return;
+  mark('full-decor-start');
+  if (decorTarget) {
+    createPlantDecor(m, decorTarget);
+    labels.visible = !!((SHOTS[currentShot] || {}).labels);
+    nightGlow.visible = currentPreset.stars > 0.3;
+    decorTarget = null;
+  }
+  mark('full-decor-done');
+  mark('full-contact-start');
+  contactShadows = createContactShadows();
+  contactShadows.visible = Q.contactShadows;
+  scene.add(contactShadows);
+  mark('full-contact-done');
+  mark('full-ground-start');
+  scene.remove(groundLite);
+  const groundFull = createGround(m);
+  scene.add(groundFull);
+  /* 不烘焙：本环境下 draw call 很便宜（实测 1688 draw = 19ms），合并反而要 2–3s */
+  scene.add(createHills(m));
+  mark('full-ground-done');
+  mark('full-env-start');
+  envMapReady = true;
+  rebuildEnvironment(currentPresetKey);
+  mark('full-env-done');
+  /* 先建 postFX 再 applyQuality：SSAO/DOF/FXAA 的开关由 applyQuality 写入 pass */
+  buildPostFX();
+  mark('full-postfx-done');
+  applyQuality(quality, { announce: false });
+  mark('full-quality-done');
+  applyLook(currentPreset);
+  mark('full-look-done');
+  render();
+  mark('full-render-done');
+  fullReady = true;
+  window.__fullReadyAt = performance.now();
+  window.__fullReady = true;
+  console.info(`[boot] full quality ready ${(performance.now() / 1000).toFixed(1)}s (lean ready was earlier)`);
+}
+window.__upgradeFull = upgradeToFull;
+
+/* ------------------------------------------------------------------ */
+/* 冷启动诊断 API                                                       */
+/* ------------------------------------------------------------------ */
+function materialFlags(mat) {
+  const f = [mat.type];
+  const texKeys = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap',
+    'alphaMap', 'bumpMap', 'displacementMap', 'lightMap', 'envMap', 'specularMap', 'anisotropyMap'];
+  for (const k of texKeys) if (mat[k]) f.push(k);
+  if (mat.emissive && (mat.emissive.r > 0 || mat.emissive.g > 0 || mat.emissive.b > 0)) f.push('emissive');
+  if (mat.transparent) f.push('transparent');
+  if (mat.vertexColors) f.push('vcolors');
+  if (mat.alphaTest) f.push('alphaTest');
+  if (mat.side === THREE.DoubleSide) f.push('doubleSide');
+  if (mat.isShaderMaterial) f.push('shader');
+  if (mat.blending === THREE.AdditiveBlending) f.push('additive');
+  return f.join('+');
+}
+window.__renderInfo = () => {
+  const programs = (renderer.info.programs || []).map((p) => ({
+    name: p.name, id: p.id, usedTimes: p.usedTimes, key: String(p.cacheKey || '').slice(0, 120),
+  }));
+  const groups = {};
+  let meshes = 0;
+  scene.traverse((o) => {
+    if (!o.isMesh && !o.isPoints && !o.isLine) return;
+    meshes++;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      const key = materialFlags(mat);
+      if (!groups[key]) groups[key] = { key, materials: [], meshes: 0, visible: 0 };
+      const g = groups[key];
+      if (!g.materials.includes(mat.name || mat.uuid)) g.materials.push(mat.name || mat.uuid);
+      g.meshes++;
+      if (o.visible) g.visible++;
+    }
+  });
+  const gl = renderer.getContext();
+  let gpu = '';
+  try {
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    if (ext) gpu = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+  } catch { /* ignore */ }
+  return {
+    programs: programs.length,
+    programList: programs,
+    programsByType: programs.reduce((acc, p) => { acc[p.name] = (acc[p.name] || 0) + 1; return acc; }, {}),
+    groups: Object.values(groups).sort((a, b) => b.meshes - a.meshes),
+    meshes,
+    render: { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, points: renderer.info.render.points, lines: renderer.info.render.lines },
+    memory: { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures },
+    gpu,
+    parallelCompile: renderer.extensions.has('KHR_parallel_shader_compile'),
+    compileMode: prep,
+    quality,
+  };
+};
+window.__timing = () => ({
+  marks: marksList(),
+  gl: glSummary(),
+  programs: programTimings(renderer),
+  now: +performance.now().toFixed(1),
+});
+window.__progBench = (n = 6) => {
+  const times = [];
+  for (let i = 0; i < n; i++) {
+    const mat = m.steel.clone();
+    mat.defines = { PROG_BENCH: i + 1 };
+    mat.needsUpdate = true;
+    const sc = new THREE.Scene();
+    sc.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat));
+    const t = performance.now();
+    renderer.compile(sc, camera);
+    times.push(+(performance.now() - t).toFixed(1));
+  }
+  return times;
+};
+window.__pmremBench = () => {
+  const gen = new THREE.PMREMGenerator(renderer);
+  const out = {};
+  let t = performance.now();
+  gen.compileEquirectangularShader();
+  out.compileEquirectMs = +(performance.now() - t).toFixed(1);
+  const basic = new THREE.Scene();
+  basic.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 10), new THREE.MeshBasicMaterial({ color: 0x8899aa })));
+  t = performance.now();
+  gen.fromScene(basic, 0.02, 0.1, 100);
+  out.basicFromSceneMs = +(performance.now() - t).toFixed(1);
+  t = performance.now();
+  gen.fromScene(envScene, 0.02, 0.1, 100);
+  out.skyFromSceneWarmMs = +(performance.now() - t).toFixed(1);
+  const sky2 = new THREE.Scene();
+  const mat2 = sky.material.clone();
+  mat2.defines = { SKY_BENCH: 1 };
+  mat2.needsUpdate = true;
+  sky2.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 10), mat2));
+  t = performance.now();
+  gen.fromScene(sky2, 0.02, 0.1, 100);
+  out.skyCloneFromSceneMs = +(performance.now() - t).toFixed(1);
+  return out;
+};
+window.__benchReal = () => {
+  const src = window.__snapshotBuffer;
+  const items = BAKED_META.items;
+  const run = (buffer) => {
+    const out = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const t = performance.now();
+      const pos = new Float32Array(buffer, it.position.offset, it.position.count * 3);
+      const nor = new Float32Array(buffer, it.normal.offset, it.normal.count * 3);
+      const uv = new Float32Array(buffer, it.uv.offset, it.uv.count * 2);
+      const idx = new Uint32Array(buffer, it.index.offset, it.index.count);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      geo.setIndex(new THREE.BufferAttribute(idx, 1));
+      geo.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geo, m[it.material]);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      out.push(+(performance.now() - t).toFixed(1));
+    }
+    return out;
+  };
+  const real = run(src);
+  const copy = src.slice(0);
+  const copied = run(copy);
+  return { realTop: real.slice().sort((a, b) => b - a).slice(0, 6), realTotal: +real.reduce((a, b) => a + b, 0).toFixed(1),
+    copyTop: copied.slice().sort((a, b) => b - a).slice(0, 6), copyTotal: +copied.reduce((a, b) => a + b, 0).toFixed(1) };
+};
+window.__benchDirect = (n = 10) => {
+  const r = window.__renderer;
+  const pr = r.getPixelRatio();
+  r.shadowMap.enabled = false;
+  const t = performance.now();
+  for (let i = 0; i < n; i++) r.render(window.__scene, window.__camera);
+  const direct = +((performance.now() - t) / n).toFixed(2);
+  r.shadowMap.enabled = true;
+  return { directMsPerFrame: direct, dpr: pr, calls: r.info.render.calls, tris: r.info.render.triangles };
+};
+window.__benchViews = () => {
+  const dst = new ArrayBuffer(BAKED_META.bytes);
+  const items = BAKED_META.items;
+  const first = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const t = performance.now();
+    const pos = new Float32Array(dst, it.position.offset, it.position.count * 3);
+    const nor = new Float32Array(dst, it.normal.offset, it.normal.count * 3);
+    const uv = new Float32Array(dst, it.uv.offset, it.uv.count * 2);
+    const idx = new Uint32Array(dst, it.index.offset, it.index.count);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, m.steel);
+    first.push(+(performance.now() - t).toFixed(1));
+  }
+  const tCopy = performance.now();
+  const copy = dst.slice(0);
+  const copyMs = +(performance.now() - tCopy).toFixed(1);
+  return { perItem: first.slice(0, 10), total: +first.reduce((a, b) => a + b, 0).toFixed(1), copyMs, bytes: copy.byteLength };
+};
+window.__compileProbe = async (mode = 'compile') => {
+  const t = performance.now();
+  if (mode === 'async') await renderer.compileAsync(scene, camera);
+  else renderer.compile(scene, camera);
+  return +((performance.now() - t).toFixed(1));
+};
+
 window.__setStats = (on = true) => {
   statsVisible = !!on;
   if (statsEl) statsEl.style.display = statsVisible ? 'block' : 'none';
@@ -722,13 +1039,13 @@ window.__setDof = (on = true) => {
   dofMode = on ? 'on' : 'off';
   updateDofState();
   render();
-  return dofPass.enabled;
+  return !!(dofPass && dofPass.enabled);
 };
-window.__setAO = (on = true) => { ssaoPass.enabled = !!on; render(); return ssaoPass.enabled; };
-window.__setContactShadows = (on = true) => { contactShadows.visible = !!on; render(); return contactShadows.visible; };
-window.__setBloom = (on = true) => { bloom.enabled = !!on; render(); return bloom.enabled; };
-window.__setFXAA = (on = true) => { fxaaPass.enabled = !!on; render(); return fxaaPass.enabled; };
-window.__setCinematic = (on = true) => { cinematic.enabled = !!on; render(); return cinematic.enabled; };
+window.__setAO = (on = true) => { if (!ssaoPass) return false; ssaoPass.enabled = !!on; render(); return ssaoPass.enabled; };
+window.__setContactShadows = (on = true) => { if (!contactShadows) return false; contactShadows.visible = !!on; render(); return contactShadows.visible; };
+window.__setBloom = (on = true) => { if (!bloom) return false; bloom.enabled = !!on; render(); return bloom.enabled; };
+window.__setFXAA = (on = true) => { if (!fxaaPass) return false; fxaaPass.enabled = !!on; render(); return fxaaPass.enabled; };
+window.__setCinematic = (on = true) => { if (!cinematic) return false; cinematic.enabled = !!on; render(); return cinematic.enabled; };
 window.__setExposure = (v = 1) => { exposureScale = 1; baseExposure = Number(v) || 1; renderer.toneMappingExposure = baseExposure; render(); return baseExposure; };
 window.__shadowInfo = () => ({
   mapSize: lights.sun.shadow.mapSize.toArray(),
@@ -745,6 +1062,11 @@ window.__setShot = (name) => {
   return { shot: currentShot, labels: labels.visible, quality };
 };
 window.__renderOnce = render;
+window.__renderer = renderer;
+window.__scene = scene;
+window.__camera = camera;
+window.__composer = composer;
+window.__materials = m;
 
 /* ------------------------------------------------------------------ */
 /* 工艺流程动画 API（可复现截图）                                        */
@@ -846,10 +1168,26 @@ window.__occlude = (pts) => {
   return out;
 };
 
+/* 可选：首帧前显式编译（?prep=compile|compileasync），用于对比同步 / 并行编译 */
+const prep = params.get('prep') || 'none';
+if (prep !== 'none') {
+  mark('prep-start');
+  if (prep === 'compileasync') await renderer.compileAsync(scene, camera);
+  else renderer.compile(scene, camera);
+  mark('prep-done');
+}
+
 const initial = params.get('shot') || 'aerial';
+mark('set-shot-start');
 setShot(initial);
+mark('set-shot-done');
+mark('boot-compile-start');
+renderer.compile(scene, camera);
+mark('boot-compile-done');
+mark('first-render-start');
 render();
-mark('first frame');
+mark('first-render-done');
+mark('first-frame');
 animate();
 
 // ?anim=1&stage=0&t=6 直接进入动画演示（便于无头截图）
@@ -872,8 +1210,13 @@ if (loading) {
   setTimeout(() => loading.remove(), 700);
 }
 
+mark('ready');
+window.__readyAt = performance.now();
 window.__ready = true;
 window.__animReady = true;
+/* 首帧已上屏 → 下一帧之后再升级完整画质，避免抢占可交互时间 */
+requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => { upgradeToFull(); }, 0)));
+window.__fullReady = false;
 autoQStart = performance.now() + 6000;
 console.log('[refinery] ready', JSON.stringify({ shots: Object.keys(SHOTS), stages: anim.stages.length }));
 /* debug helpers (not used in production views) */
@@ -881,8 +1224,8 @@ window.__debug = (opts = {}) => {
   const { fog = true, sky: skyOn = true, bloom: bloomOn = true, cinematic: cineOn = true } = opts;
   scene.fog = fog ? new THREE.FogExp2(currentPreset.fog, currentPreset.fogDensity) : null;
   sky.visible = skyOn;
-  bloom.enabled = bloomOn;
-  cinematic.enabled = cineOn;
+  if (bloom) bloom.enabled = bloomOn;
+  if (cinematic) cinematic.enabled = cineOn;
   renderer.shadowMap.enabled = opts.shadows !== false;
   render();
   return { fog, sky: skyOn, bloom: bloomOn, cinematic: cineOn };
@@ -983,9 +1326,9 @@ window.__clay = () => {
   scene.background = new THREE.Color(0x0e1216);
   cinematic.enabled = false;
   fxaaPass.enabled = false;
-  ssaoPass.enabled = false;
-  dofPass.enabled = false;
-  bloom.enabled = false;
+  if (ssaoPass) ssaoPass.enabled = false;
+  if (dofPass) dofPass.enabled = false;
+  if (bloom) bloom.enabled = false;
   lights.sun.position.set(-0.4, 0.85, 0.35).multiplyScalar(400);
   lights.sun.intensity = 3.2;
   lights.hemi.intensity = 0.9;

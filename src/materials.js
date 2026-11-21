@@ -10,7 +10,37 @@ function withRepeat(map, x, y) {
   m.needsUpdate = true;
   m.wrapS = m.wrapT = THREE.RepeatWrapping;
   m.repeat.set(x, y);
+  constrainPrograms(m);
   return m;
+}
+
+/** 统一 shader 变体：不透明 MeshStandardMaterial 全部带 map+emissiveMap */
+export function constrainPrograms(m) {
+  const white = solidTexture(255, 255, 255);
+  const black = solidTexture(0, 0, 0);
+  for (const mat of Object.values(m)) {
+    if (!mat || !mat.isMaterial || mat.isSpriteMaterial) continue;
+    if (mat.isMeshStandardMaterial) {
+      if (!mat.map) mat.map = white;
+      if (!mat.emissiveMap) {
+        const e = mat.emissive;
+        const lit = e && (e.r > 0 || e.g > 0 || e.b > 0);
+        mat.emissiveMap = lit ? white : black;
+      }
+    } else if (mat.isMeshBasicMaterial) {
+      if (!mat.map && !mat.vertexColors) mat.map = white;
+    }
+  }
+}
+
+/* 1×1 纯色纹理：给所有 MeshStandardMaterial 补齐 map / emissiveMap，
+ * 让它们共享同一个 shader program（否则 map / emissiveMap 的有无会各自生成变体）。
+ * 白色乘法不改变颜色；黑色 emissiveMap 让无自发光材质与原来完全一致。 */
+function solidTexture(r, g, b) {
+  const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
 }
 
 export function createMaterials() {

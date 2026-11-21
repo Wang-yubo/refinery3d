@@ -31,7 +31,7 @@ page.on('requestfailed', (r) => errors.push('[requestfailed] ' + r.url()));
 
 const t0 = Date.now();
 await page.goto('http://127.0.0.1:4321/?clean=1&anim=1&stage=0', { waitUntil: 'domcontentloaded', timeout: 300000 });
-await page.waitForFunction('window.__ready === true && window.__animReady === true', { timeout: 300000, polling: 300 });
+await page.waitForFunction('window.__ready === true && window.__fullReady === true && window.__animReady === true', { timeout: 300000, polling: 300 });
 await page.evaluate(() => window.__pauseAnim());
 console.log(`loaded in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 

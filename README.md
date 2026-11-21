@@ -80,9 +80,11 @@ node tools/serve.mjs . 4321
 | high 截图 FPS（景深开启） | ≈ 28.3（景深开销 15.3%） |
 | high 交互 FPS（1280×720） | 60（vsync 上限） |
 | low 交互 FPS（1280×720） | 60（vsync 上限） |
-| high draw calls / triangles | 244 / ≈ 1.05 M（预烘焙路径） |
-| 冷启动到 `__ready`（预烘焙，high） | ≈ 44 s（实测 43.9–45.7 s） |
-| 冷启动到 `__ready`（`?procedural=1`，high） | ≈ 62 s |
+| high draw calls / triangles | 244 / ≈ 1.05 M（预烘焙路径；`__perf()` 的 calls 会累加 composer 各 pass） |
+| 冷启动到 `__ready`（预烘焙，high） | ≈ 28.4 s（A6b，3 次中位 28.1–29.2；A 批 ≈ 44 s） |
+| 冷启动到 `__fullReady`（完整画质） | ≈ 41 s（`__ready` 后约 12 s 补齐） |
+| 同 profile 二次加载（warm → `__ready`） | ≈ 27.8 s（本机无磁盘 program 缓存，与冷启动接近） |
+| 冷启动到 `__ready`（`?procedural=1`，high） | ≈ 42.8 s（A6b；A 批 ≈ 62 s） |
 | 预烘焙相对实时代码构建的冷启动降幅 | ≈ 27–29% |
 
 > 测试环境为无头软件渲染（`--enable-unsafe-swiftshader --use-angle=metal`），实际带独立 GPU 的桌面浏览器会明显更快；1280×720 下 high/low 都可能被 60 Hz vsync 截顶，因此低档收益主要体现在 1920×1080 与移动端高 DPR 场景。首帧主要受 40+ 材质变体的 GPU shader 编译限制。
@@ -113,6 +115,9 @@ node tools/serve.mjs . 4321
 | `window.__setDof(on)` | 强制景深开关 |
 | `window.__setAO(on)` / `__setContactShadows(on)` / `__setBloom(on)` / `__setFXAA(on)` | 分项调试开关 |
 | `window.__shadowInfo()` | 当前阴影相机尺寸、贴图大小与焦点 |
+| `window.__renderInfo()` | 程序数 / 按材质分组 / render 统计 / 显存 / GPU 与 `KHR_parallel_shader_compile` |
+| `window.__timing()` | 冷启动分段 `perf.mark` 列表（含 GL 链路耗时汇总） |
+| `window.__fullReady` | 完整画质（装饰 / PMREM / postFX / 完整档位）是否就绪 |
 
 ### A 批改动
 
@@ -123,6 +128,95 @@ node tools/serve.mjs . 4321
 - **A5 电影感后处理**：色差、柔暗角、细颗粒、±8% 缓慢曝光自适应；景深只在机位截图 / 巡游时开启，拖拽或流程标签时自动关闭，`?dof=1` 可强制。
 - **A6 冷启动**：`tools/build-baked.mjs` 在构建期导出 `bakeStatic` 后的 41 个合并 Mesh（position/normal/uv/index + 材质名）到 `assets/baked.bin`（20.5 MB）/ `assets/baked.json`；运行时默认先 fetch 快照并直接 `BufferGeometry.setAttribute` 重建，跳过 units/plant 构建与 bake；几何元数据内联在 `src/bakedMeta.js`，只下载 20.5 MB 二进制。标签、夜间光晕、蒸汽、火炬火焰、控制室玻璃由 `createPlantDecor()` 补充；`?procedural=1` 可回退。
 
+### A6b 冷启动优化
+
+**测量工具**（新增，先量化再改代码）
+
+\`\`\`bash
+node tools/profile-startup.mjs --runs 3          # 冷启动 ×3（各自独立 profile）
+node tools/profile-startup.mjs --warm 1          # 同一 profile 连续两次（第二次为 warm）
+node tools/profile-startup.mjs --query "?shot=hero" --prep compile   # 指定机位 / 预热方式
+\`\`\`
+
+页面内 \`src/prof.js\` 用 \`performance.mark\` 打点（\`window.__t0\` 起算），并包装 \`gl.linkProgram\`、\`gl.compileShader\`、\`gl.bufferData\`、\`gl.drawElements\` 统计真实 GL 链路耗时；结果写入 \`diag/profile-startup.json\`，同时提供 \`window.__renderInfo()\` / \`window.__timing()\` 两个运行时诊断 API。
+
+**实测结论：着色器编译不是瓶颈**（headless Chrome + ANGLE Metal，M1，1920×1080）
+
+| 项 | 实测 |
+| --- | --- |
+| \`gl.linkProgram\` × 40 个程序 | 9.8 ms |
+| \`gl.compileShader\` × 80 个 shader | 7.5 ms |
+| 21.1 MB 顶点/索引上传（478 次 \`bufferData\`） | 25 ms |
+| 1688 次 draw call 的 GL 调用本身 | 19 ms |
+
+开销集中在 JS 侧的一次性成本：每个 program 的装配 + uniform/attrib 反射 + V8 首次 JIT（首个 ≈1.4 s，之后 20–90 ms）、PMREM \`fromScene\` 3.1–4.4 s、\`bakeStatic\` 2–5 s、首帧渲染路径首次执行 ≈6 s、\`createAnimation\` ≈7 s。所以优化方向是**减少首帧之前必须完成的工作**，而不是微优化 draw / shader。
+
+**首帧渐进升级（staged boot）**
+
+1. 轻量首帧：DPR 1、阴影只保留 define 不渲染贴图（\`shadowMap.autoUpdate = false\`）、无 postFX、无 PMREM 环境图、无标签/蒸汽/夜间光晕、轻量地面（草地 + 砾石两个平面）；
+2. \`__ready\` 置位后用 \`requestAnimationFrame\`×2 触发 \`upgradeToFull()\`：装饰 → 完整地面 + 远山 → 接触阴影 → PMREM 环境图 → 完整档位（DPR / 阴影贴图 / composer）→ \`applyLook\` → render → \`__fullReady\`；
+3. 所有截图/回归工具改为等待 \`window.__fullReady\`，保证出图仍是完整画质。
+
+**其它改动**
+
+- **材质程序合并**：\`constrainPrograms()\` 给每个 \`MeshStandardMaterial\` 补 1×1 白/黑 \`map\` / \`emissiveMap\`（\`MeshBasicMaterial\` 同理），消除「同材质、不同贴图组合」导致的重复 program，首帧程序数 40 → 6；
+- **快照 gzip**：\`assets/baked.bin\` 20.53 MB → \`assets/baked.bin.gz\` 2.92 MB（-85.8%，3057022 B），运行时用 \`DecompressionStream('gzip')\` 解压，浏览器不支持或 404 时回退明文；打包脚本 \`tools/pack-baked.mjs\`；
+- **下载提前**：快照 fetch 在建场之前发起，与天空/灯光/轻量地面创建并行；
+- **取消运行时 merge**：地面与混合罐组不再调用 \`bakeStatic\`——本环境 draw call 极便宜（19 ms / 1688 draw），合并 60 个网格反而要 2–3 s；合并只保留在构建期（\`build-baked\`）。
+
+**数据**（同机同法，预烘焙路径）
+
+| 指标 | A 批 | A6b | 变化 |
+| --- | --- | --- | --- |
+| 冷启动 → \`__ready\` | 43.9–45.7 s | 28.1 / 28.4 / 29.2 s（中位 **28.4 s**） | **-35.5%** |
+| 冷启动 → \`__fullReady\` | — | 40.8 / 41.1 / 42.2 s（中位 41.1 s） | 首帧后 +12.7 s 补齐 |
+| 同 profile 二次加载 → \`__ready\` | — | 27.8 s | 与冷启动基本一致 |
+| 轻量首帧 program 数 | 40 | 6 | -85% |
+| \`assets/baked.bin\` 传输量 | 20.53 MB | 2.92 MB（gzip） | -85.8% |
+
+冷启动分段（3 次中位，页面内 \`perf.mark\`）：
+
+| 阶段 | 耗时 |
+| --- | --- |
+| 模块解析 + 渲染器 + 材质初始化 | 3.2 s |
+| 快照下载（2.92 MB gzip） | 1.7 s |
+| 快照重建 42 个 geometry | 2.2 s |
+| \`createAnimation\`（含物流管线/罐车/风机） | 7.0 s |
+| 交互系统 + 机位 | 1.2 s |
+| 首帧 program 生成（\`renderer.compile\`） | 4.5 s |
+| 首帧 \`render\` | 6.0 s |
+| 首帧提交 / present | 1.2 s |
+
+**为什么还没到 ≤15 s（剩余瓶颈）**
+
+本机（无头 + ANGLE Metal + 低效 JIT）的固定成本：单个 program 冷装配 0.8–1.4 s、首帧渲染路径首次执行 ≈6 s、\`createAnimation\` 7 s、快照重建首个 item 固定 ≈1.4 s。这些与画质档位无关，单纯删画面也换不回来。
+
+已试并放弃的方案（收益 <5% 或负收益）：
+
+| 方案 | 结果 | 结论 |
+| --- | --- | --- |
+| \`compileAsync\` 并行链接（\`?prep=compileasync\`） | 链接本身仅 9.8 ms，并行只省 ~10 ms | 无收益 |
+| probe 场景预热（1 cube × 全材质 + 64×64 RT） | 预热自身 8.0 s，只抵消后续 4.4 s | 净亏 3.6 s |
+| 关闭 \`antialias\` | 首帧 render 6.1 s 不变（最终画面走 composer 的 4×MSAA RT） | 无收益 |
+| 运行时 \`bakeStatic(ground / blendGroup)\` | 合并 60 网格 2–3 s，多出的 draw 只值 <1 ms | 移除 |
+
+下一步可行方向（未实施，风险已在表中标注）：把 \`createAnimation\` 整体推迟到 \`upgradeToFull\`（约 -7 s；需给 HUD/流程交互加 stub，风险高）；首帧只画天空+地面占位（可进 15 s，但首帧内容不完整，属于画质回退，不做）；geometry 量化/减面（改动面大、影响视觉）。
+
+**首帧 → 完整画质的已知限制**
+
+\`__ready\` 到 \`__fullReady\` 之间（本机约 12 s）画面缺少：环境反射（金属偏暗偏灰）、阴影、SSAO/DOF/Bloom/FXAA、标签与蒸汽、完整地坪与远山。所有截图与验收都在 \`__fullReady\` 之后采集，逐机位对比见下节。
+
+### A6b 对比截图
+
+| 文件 | 内容 | 均值（vs A 批） |
+| --- | --- | --- |
+| [\`renders/opt2/a6b-aerial.png\`](renders/opt2/a6b-aerial.png) | 鸟瞰 | 115.1（115.6，-0.5） |
+| [\`renders/opt2/a6b-hero.png\`](renders/opt2/a6b-hero.png) | 主装置区 | 121.1（123.1，-2.0） |
+| [\`renders/opt2/a6b-cdu.png\`](renders/opt2/a6b-cdu.png) | 常减压特写（SSAO + 接触阴影） | 113.2（113.0，+0.2） |
+| [\`renders/opt2/a6b-low.png\`](renders/opt2/a6b-low.png) | low 档 1920×1080 | 115.5 |
+
+均值 / 暗部占比 / 过曝占比 / 性能 / 冷启动分段见 [\`renders/opt2/stats.json\`](renders/opt2/stats.json)；\`node tools/opt2-shots.mjs\` 可重新生成（同时校验与 A 批的均值偏差 ≤ ±5、clip < 1%）。
+
 ### 重新生成预烘焙快照
 
 ```bash
@@ -130,7 +224,7 @@ node tools/build-baked.mjs   # 实时构建一次并写入 assets/baked.bin/json
 node tools/opt-shots.mjs     # 生成 renders/opt/ 下的 A 批对比截图与 stats.json
 ```
 
-> **已知限制**：无头 Chrome / ANGLE Metal 的首帧主要耗时在 40+ 个材质变体的 GPU shader 编译（约 24 s），快照只能消除约 10–15 s 的建模与 bake 时间，尚未达到「首帧 < 10 s」的目标；在真实 GPU 与已预热 shader 缓存的浏览器中，首帧会显著缩短。SSAO 为自研简化实现，不是 GTAO；DOF 为 12 taps 简化 bokeh。
+> **已知限制**：实测（`gl.linkProgram` 全场景 40 个程序合计 9.8 ms）表明首帧并不卡在 shader 编译，而是卡在 program 装配 / 反射查询 / V8 首次 JIT / 首帧渲染路径首次执行 / PMREM 与 `createAnimation` 等一次性 JS 成本上（见「A6b 冷启动优化」）。A6b 把这些工作拆到 `__ready` 之后，本机冷启动 44 s → 28.4 s，但未达到 ≤15 s。SSAO 为自研简化实现，不是 GTAO；DOF 为 12 taps 简化 bokeh。
 
 ## 设备交互
 

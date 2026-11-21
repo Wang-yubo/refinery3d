@@ -1,32 +1,37 @@
 import * as THREE from 'three';
+import { mark } from './prof.js';
 
 /**
- * 读取构建期 bakeStatic 导出的静态合并几何快照，跳过 units/plant 的建模与合并。
+ * 优先下载 gzip 快照（2.9MB vs 20.5MB），用浏览器原生 DecompressionStream 解压；
+ * 浏览器不支持 / 404 / 解压失败时回退到未压缩 baked.bin。
+ */
+export async function fetchSnapshot({
+  binUrl = './assets/baked.bin',
+  gzUrl = './assets/baked.bin.gz',
+} = {}) {
+  if (typeof DecompressionStream !== 'undefined') {
+    try {
+      const res = await fetch(gzUrl, { cache: 'force-cache' });
+      if (res.ok && res.body) {
+        const stream = res.body.pipeThrough(new DecompressionStream('gzip'));
+        return await new Response(stream).arrayBuffer();
+      }
+    } catch (err) {
+      console.warn('[baked] gzip 快照不可用，回退 baked.bin：', err.message);
+    }
+  }
+  const binRes = await fetch(binUrl, { cache: 'force-cache' });
+  if (!binRes.ok) throw new Error(`snapshot bin ${binRes.status}`);
+  return binRes.arrayBuffer();
+}
+
+/**
+ * 把快照二进制重建为 42 个 BufferGeometry（零拷贝视图），返回 plant root。
  * 快照只包含不透明、已合并的装置 Mesh；标签、蒸汽、夜间光晕、火炬火焰等
  * 动态/透明对象由 createPlantDecor() 在运行时补充。
  */
-export async function loadPlantSnapshot(materials, {
-  jsonUrl = './assets/baked.json',
-  binUrl = './assets/baked.bin',
-  meta: inlineMeta = null,
-  onProgress = () => {},
-} = {}) {
+export function buildSnapshot(buffer, meta, materials, { onProgress = () => {} } = {}) {
   const t0 = performance.now();
-  onProgress(0.05, '读取场景快照 …');
-  // 默认使用构建期内联的元数据（省一次请求）；缺失时再回退到 baked.json
-  let meta = inlineMeta;
-  let tMeta = t0;
-  if (!meta) {
-    const metaRes = await fetch(jsonUrl, { cache: 'force-cache' });
-    if (!metaRes.ok) throw new Error(`snapshot meta ${metaRes.status}`);
-    meta = await metaRes.json();
-    tMeta = performance.now();
-  }
-  onProgress(0.18, '下载烘焙几何 …');
-  const binRes = await fetch(binUrl, { cache: 'force-cache' });
-  if (!binRes.ok) throw new Error(`snapshot bin ${binRes.status}`);
-  const buffer = await binRes.arrayBuffer();
-  const tBin = performance.now();
   if (buffer.byteLength !== meta.bytes) {
     throw new Error(`snapshot size mismatch ${buffer.byteLength} != ${meta.bytes}`);
   }
@@ -34,10 +39,14 @@ export async function loadPlantSnapshot(materials, {
   const root = new THREE.Group();
   root.name = 'plant';
   const total = meta.items.length;
+  const itemMs = [];
+  let progressMs = 0;
+  const progress = (p, text) => { const t = performance.now(); onProgress(p, text); progressMs += performance.now() - t; };
   let vertexCount = 0;
   let triangleCount = 0;
 
   meta.items.forEach((it, i) => {
+    const tItem = performance.now();
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(buffer, it.position.offset, it.position.count * 3);
     const nor = new Float32Array(buffer, it.normal.offset, it.normal.count * 3);
@@ -58,12 +67,38 @@ export async function loadPlantSnapshot(materials, {
     mesh.userData.baked = true;
     mesh.userData.bakeMaterial = it.material;
     root.add(mesh);
+    itemMs.push({ mat: it.material, verts: it.position.count, ms: +(performance.now() - tItem).toFixed(1) });
     vertexCount += it.position.count;
     triangleCount += it.index.count / 3;
-    if (i % 6 === 0) onProgress(0.2 + 0.78 * (i / total), '重建烘焙几何 …');
+    if (i % 8 === 0) progress(0.2 + 0.78 * (i / total), '重建烘焙几何 …');
   });
 
+  if (typeof window !== 'undefined') {
+    window.__snapProfile = { items: itemMs, progressMs: +progressMs.toFixed(1), totalMs: +(performance.now() - t0).toFixed(1) };
+    window.__snapshotBuffer = buffer;
+  }
   onProgress(1, '快照加载完成');
-  console.log(`[snapshot] meta ${(tMeta - t0).toFixed(0)}ms bin ${(tBin - tMeta).toFixed(0)}ms rebuild ${(performance.now() - tBin).toFixed(0)}ms`);
   return { root, meta, vertexCount, triangleCount, bytes: buffer.byteLength };
+}
+
+/** 兼容旧调用：下载 + 重建一步完成 */
+export async function loadPlantSnapshot(materials, {
+  jsonUrl = './assets/baked.json',
+  binUrl = './assets/baked.bin',
+  gzUrl = './assets/baked.bin.gz',
+  meta: inlineMeta = null,
+  onProgress = () => {},
+} = {}) {
+  let meta = inlineMeta;
+  if (!meta) {
+    const metaRes = await fetch(jsonUrl, { cache: 'force-cache' });
+    if (!metaRes.ok) throw new Error(`snapshot meta ${metaRes.status}`);
+    meta = await metaRes.json();
+  }
+  mark('bin-fetch-start');
+  const buffer = await fetchSnapshot({ binUrl, gzUrl });
+  mark('bin-fetch-done');
+  const snap = buildSnapshot(buffer, meta, materials, { onProgress });
+  mark('bin-rebuild-done');
+  return snap;
 }

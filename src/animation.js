@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mark } from './prof.js';
 import { box, cyl, pipeRun, leaderLine, bakeStatic, labelSprite, makeGlow } from './helpers.js';
 import { tankTruck } from './units.js';
 
@@ -277,6 +278,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   flowRoot.visible = false;
   scene.add(staticRoot, envRoot, flowRoot);
 
+  mark('anim-blend-start');
   /* ---------------- product blending unit ---------------- */
   const blendGroup = new THREE.Group();
   blendGroup.name = 'blending';
@@ -304,7 +306,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     blendGroup.add(cyl(0.18, 0.18, 1.2, m.pipeGray, x - 0.35, 1.8, 62, 8));
   }
   staticRoot.add(blendGroup);
-  bakeStatic(blendGroup);
+  /* 不做运行时合并：合并 60 个圆柱/盒子在 headless 下要 ~3s，而多 60 个 draw 只值 <1ms */
 
   // 给流程图补一个「产品调和」标注
   const blendLabel = labelSprite('产品调和', 'Product Blending', { accent: '#5fd0ff', scale: 1.35 });
@@ -313,6 +315,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   const blendLeader = leaderLine([136, 10, 44], [140, 22.5, 32]);
   labels.add(blendLeader);
 
+  mark('anim-blend-done');
   /* ---------------- flow streams ---------------- */
   const glowTex = m.glowTex;
   const _tmp = new THREE.Vector3();
@@ -403,6 +406,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
 
   const streams = STREAMS.map((def) => new Stream(def));
 
+  mark('anim-streams-done');
   /* ---------------- stage rings ---------------- */
   const ringGroups = [];
   for (const s of STAGES) {
@@ -430,6 +434,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     ringGroups.push({ group: g, outer, inner, aura, stage: s });
   }
 
+  mark('anim-rings-done');
   /* ---------------- stage spot light ---------------- */
   const spotTarget = new THREE.Object3D();
   const spot = new THREE.SpotLight(0xffd7a6, 0, 230, 0.48, 0.72, 2);
@@ -439,6 +444,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   flowRoot.add(spot, spotTarget);
   spot.target = spotTarget;
 
+  mark('anim-spot-done');
   /* ---------------- environment: smoke / steam ---------------- */
   const smoke = [];
   plant.traverse((o) => {
@@ -455,6 +461,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     }
   });
 
+  mark('anim-smoke-done');
   /* ---------------- environment: flare flame ---------------- */
   const flameCones = [];
   let flareGlow = null;
@@ -478,6 +485,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   flareLight.position.set(172, 84, -120);
   envRoot.add(flareLight);
 
+  mark('anim-flame-done');
   /* ---------------- environment: air-cooler fans ---------------- */
   const fanInst = makeFanInstances(m);
   const fans = [];
@@ -495,6 +503,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   const _s1 = new THREE.Vector3(1, 1, 1);
   const _v3 = new THREE.Vector3();
 
+  mark('anim-fans-done');
   /* ---------------- environment: aviation beacons ---------------- */
   const BEACONS = [
     [142, 44.6, -104],
@@ -508,6 +517,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     return g;
   });
 
+  mark('anim-beacons-done');
   /* ---------------- environment: tank trucks ---------------- */
   function makeTruck(colorShift = 0) {
     const t = tankTruck(m);
@@ -532,6 +542,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     tr.g.rotation.y = tr.dir > 0 ? Math.PI : 0;
   }
 
+  mark('anim-trucks-done');
   /* ---------------- environment: loading arms + valve wheels ---------------- */
   const hoses = [];
   for (let i = 0; i < 4; i++) {
@@ -631,6 +642,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     isActive: () => state.active,
   };
 
+  mark('anim-arms-done');
   /* ---------------- camera ---------------- */
   function camApply(cam) {
     camera.position.set(cam.pos[0], cam.pos[1], cam.pos[2]);

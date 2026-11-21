@@ -238,6 +238,15 @@ function roadMarkings(group, mat, x1, z1, x2, z2, y = 0.14) {
   }
 }
 
+/** 冷启动轻量地面：只保留草地底 + 碎石场坪，其余路面/标线在完整画质阶段补齐 */
+export function createGroundLite(m) {
+  const g = new THREE.Group();
+  g.name = 'ground';
+  g.add(plane(2400, 2400, m.grass, 0, 0, -0.08));
+  g.add(plane(640, 520, m.gravel, -10, 0, -0.02));
+  return g;
+}
+
 export function createGround(m) {
   const g = new THREE.Group();
 

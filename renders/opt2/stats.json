@@ -1,0 +1,993 @@
+{
+  "generated": "2026-11-21T18:09:11.228Z",
+  "cold": {
+    "wallToReady": 28.98,
+    "wallToFull": 42.05,
+    "phases": {
+      "marks": [
+        {
+          "name": "main-module",
+          "t": 1297.8,
+          "dt": 1297.8
+        },
+        {
+          "name": "renderer",
+          "t": 2160.7,
+          "dt": 862.9
+        },
+        {
+          "name": "materials",
+          "t": 3175,
+          "dt": 1014.3
+        },
+        {
+          "name": "snap-fetch-begin",
+          "t": 4048.3,
+          "dt": 873.3
+        },
+        {
+          "name": "snap-fetched",
+          "t": 5818.4,
+          "dt": 1770.1
+        },
+        {
+          "name": "plant-prebaked",
+          "t": 7568.8,
+          "dt": 1750.4
+        },
+        {
+          "name": "lights-start",
+          "t": 7570.4,
+          "dt": 1.6
+        },
+        {
+          "name": "lights-done",
+          "t": 8011.9,
+          "dt": 441.5
+        },
+        {
+          "name": "geometry-baked",
+          "t": 8012,
+          "dt": 0.1
+        },
+        {
+          "name": "contact-shadows",
+          "t": 8012,
+          "dt": 0
+        },
+        {
+          "name": "anim-start",
+          "t": 8012,
+          "dt": 0
+        },
+        {
+          "name": "anim-blend-start",
+          "t": 8041.8,
+          "dt": 29.8
+        },
+        {
+          "name": "anim-blend-done",
+          "t": 9797,
+          "dt": 1755.2
+        },
+        {
+          "name": "anim-streams-done",
+          "t": 12526.7,
+          "dt": 2729.7
+        },
+        {
+          "name": "anim-rings-done",
+          "t": 12768,
+          "dt": 241.3
+        },
+        {
+          "name": "anim-spot-done",
+          "t": 12923.6,
+          "dt": 155.6
+        },
+        {
+          "name": "anim-smoke-done",
+          "t": 12923.8,
+          "dt": 0.2
+        },
+        {
+          "name": "anim-flame-done",
+          "t": 12975,
+          "dt": 51.2
+        },
+        {
+          "name": "anim-fans-done",
+          "t": 13282,
+          "dt": 307
+        },
+        {
+          "name": "anim-beacons-done",
+          "t": 13290.2,
+          "dt": 8.2
+        },
+        {
+          "name": "anim-trucks-done",
+          "t": 15503.6,
+          "dt": 2213.4
+        },
+        {
+          "name": "anim-arms-done",
+          "t": 15844.8,
+          "dt": 341.2
+        },
+        {
+          "name": "anim-done",
+          "t": 16016.5,
+          "dt": 171.7
+        },
+        {
+          "name": "interact-start",
+          "t": 16016.5,
+          "dt": 0
+        },
+        {
+          "name": "interact-done",
+          "t": 16331.6,
+          "dt": 315.1
+        },
+        {
+          "name": "aq-start",
+          "t": 16331.7,
+          "dt": 0.1
+        },
+        {
+          "name": "apply-quality",
+          "t": 16337.9,
+          "dt": 6.2
+        },
+        {
+          "name": "set-shot-start",
+          "t": 16339.7,
+          "dt": 1.8
+        },
+        {
+          "name": "set-shot-done",
+          "t": 16419.4,
+          "dt": 79.7
+        },
+        {
+          "name": "boot-compile-start",
+          "t": 16419.4,
+          "dt": 0
+        },
+        {
+          "name": "boot-compile-done",
+          "t": 20759.9,
+          "dt": 4340.5
+        },
+        {
+          "name": "first-render-start",
+          "t": 20760,
+          "dt": 0.1
+        },
+        {
+          "name": "first-render-done",
+          "t": 27277,
+          "dt": 6517
+        },
+        {
+          "name": "first-frame",
+          "t": 27277.1,
+          "dt": 0.1
+        },
+        {
+          "name": "ready",
+          "t": 28631.8,
+          "dt": 1354.7
+        },
+        {
+          "name": "full-decor-start",
+          "t": 30579.2,
+          "dt": 1947.4
+        },
+        {
+          "name": "full-decor-done",
+          "t": 30992.8,
+          "dt": 413.6
+        },
+        {
+          "name": "full-contact-start",
+          "t": 30992.8,
+          "dt": 0
+        },
+        {
+          "name": "full-contact-done",
+          "t": 31581.5,
+          "dt": 588.7
+        },
+        {
+          "name": "full-ground-start",
+          "t": 31581.5,
+          "dt": 0
+        },
+        {
+          "name": "full-ground-done",
+          "t": 31830.1,
+          "dt": 248.6
+        },
+        {
+          "name": "full-env-start",
+          "t": 31830.2,
+          "dt": 0.1
+        },
+        {
+          "name": "pmrem-start",
+          "t": 31830.4,
+          "dt": 0.2
+        },
+        {
+          "name": "pmrem-done",
+          "t": 35337.4,
+          "dt": 3507
+        },
+        {
+          "name": "full-env-done",
+          "t": 35360.6,
+          "dt": 23.2
+        },
+        {
+          "name": "full-postfx-done",
+          "t": 35571.3,
+          "dt": 210.7
+        },
+        {
+          "name": "full-quality-done",
+          "t": 35610.1,
+          "dt": 38.8
+        },
+        {
+          "name": "full-look-done",
+          "t": 35677.6,
+          "dt": 67.5
+        },
+        {
+          "name": "full-render-done",
+          "t": 41698.3,
+          "dt": 6020.7
+        }
+      ],
+      "gl": null,
+      "programs": null,
+      "now": 45823.5
+    },
+    "renderInfo": {
+      "programs": 37,
+      "programList": [
+        {
+          "name": "EquirectangularToCubeUV",
+          "id": 0,
+          "usedTimes": 1,
+          "key": "0,1,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "",
+          "id": 1,
+          "usedTimes": 1,
+          "key": "2,3,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "grass",
+          "id": 2,
+          "usedTimes": 9,
+          "key": "physical,STANDARD,,highp,srgb,false,,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "steelLight",
+          "id": 3,
+          "usedTimes": 27,
+          "key": "physical,STANDARD,,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false"
+        },
+        {
+          "name": "window",
+          "id": 4,
+          "usedTimes": 1,
+          "key": "physical,STANDARD,,highp,srgb,false,,uv,false,false,false,false,false,false,uv,false,false,false,false,false,false,false"
+        },
+        {
+          "name": "",
+          "id": 5,
+          "usedTimes": 10,
+          "key": "sprite,highp,srgb,false,,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "",
+          "id": 6,
+          "usedTimes": 14,
+          "key": "basic,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 7,
+          "usedTimes": 1,
+          "key": "basic,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "steelLight",
+          "id": 8,
+          "usedTimes": 1,
+          "key": "physical,STANDARD,,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false"
+        },
+        {
+          "name": "",
+          "id": 9,
+          "usedTimes": 6,
+          "key": "4,5,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "",
+          "id": 10,
+          "usedTimes": 6,
+          "key": "6,7,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "",
+          "id": 11,
+          "usedTimes": 13,
+          "key": "basic,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 12,
+          "usedTimes": 1,
+          "key": "basic,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 14,
+          "usedTimes": 1,
+          "key": "2,3,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,f"
+        },
+        {
+          "name": "SphericalGaussianBlur",
+          "id": 15,
+          "usedTimes": 1,
+          "key": "0,8,n,20,CUBEUV_TEXEL_WIDTH,0.0013020833333333333,CUBEUV_TEXEL_HEIGHT,0.0009765625,CUBEUV_MAX_MIP,8.0,highp,srgb-linear,"
+        },
+        {
+          "name": "",
+          "id": 16,
+          "usedTimes": 1,
+          "key": "depth,highp,srgb-linear,false,,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "steel",
+          "id": 17,
+          "usedTimes": 30,
+          "key": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "insulation",
+          "id": 18,
+          "usedTimes": 10,
+          "key": "physical,STANDARD,,highp,srgb-linear,306,1024,uv,false,false,false,false,false,false,false,false,false,false,false,false"
+        },
+        {
+          "name": "window",
+          "id": 19,
+          "usedTimes": 1,
+          "key": "physical,STANDARD,,highp,srgb-linear,306,1024,uv,false,false,false,false,false,false,uv,false,false,false,false,false,fa"
+        },
+        {
+          "name": "steelLight",
+          "id": 20,
+          "usedTimes": 1,
+          "key": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "",
+          "id": 21,
+          "usedTimes": 43,
+          "key": "sprite,highp,srgb-linear,false,,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,f"
+        },
+        {
+          "name": "flameCore",
+          "id": 22,
+          "usedTimes": 2,
+          "key": "basic,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false"
+        },
+        {
+          "name": "glass",
+          "id": 23,
+          "usedTimes": 1,
+          "key": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "",
+          "id": 24,
+          "usedTimes": 1,
+          "key": "basic,highp,srgb-linear,false,,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,fa"
+        },
+        {
+          "name": "",
+          "id": 25,
+          "usedTimes": 1,
+          "key": "9,10,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 26,
+          "usedTimes": 1,
+          "key": "9,11,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 27,
+          "usedTimes": 1,
+          "key": "12,13,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false"
+        },
+        {
+          "name": "",
+          "id": 28,
+          "usedTimes": 1,
+          "key": "14,15,KERNEL_RADIUS,3,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,f"
+        },
+        {
+          "name": "",
+          "id": 29,
+          "usedTimes": 1,
+          "key": "14,15,KERNEL_RADIUS,5,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,f"
+        },
+        {
+          "name": "",
+          "id": 30,
+          "usedTimes": 1,
+          "key": "14,15,KERNEL_RADIUS,7,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,f"
+        },
+        {
+          "name": "",
+          "id": 31,
+          "usedTimes": 1,
+          "key": "14,15,KERNEL_RADIUS,9,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,f"
+        },
+        {
+          "name": "",
+          "id": 32,
+          "usedTimes": 1,
+          "key": "14,15,KERNEL_RADIUS,11,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 33,
+          "usedTimes": 1,
+          "key": "14,16,NUM_MIPS,5,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 34,
+          "usedTimes": 1,
+          "key": "17,18,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false"
+        },
+        {
+          "name": "OutputShader",
+          "id": 35,
+          "usedTimes": 1,
+          "key": "19,20,SRGB_TRANSFER,,ACES_FILMIC_TONE_MAPPING,,onBeforeCompile( /* shaderobject, renderer */ ) {}"
+        },
+        {
+          "name": "",
+          "id": 36,
+          "usedTimes": 1,
+          "key": "9,21,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,"
+        },
+        {
+          "name": "",
+          "id": 37,
+          "usedTimes": 1,
+          "key": "9,22,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,f"
+        }
+      ],
+      "programsByType": {
+        "EquirectangularToCubeUV": 1,
+        "": 24,
+        "grass": 1,
+        "steelLight": 3,
+        "window": 2,
+        "SphericalGaussianBlur": 1,
+        "steel": 1,
+        "insulation": 1,
+        "flameCore": 1,
+        "glass": 1,
+        "OutputShader": 1
+      },
+      "groups": [
+        {
+          "key": "MeshStandardMaterial",
+          "materials": [
+            "steelLight",
+            "steelDark",
+            "steel",
+            "pipeGray",
+            "railingGray",
+            "pipeSilver",
+            "ladder",
+            "pipeYellow",
+            "pipeGreen",
+            "cable",
+            "blue",
+            "pipeRed",
+            "railing",
+            "fireRed",
+            "buildingWarm",
+            "rust",
+            "roof",
+            "pipeOrange",
+            "water",
+            "carBody",
+            "carDark",
+            "tankTruck",
+            "trunk",
+            "roadLine",
+            "ab3f540d-9611-443d-8fd3-19e4dd531ce3",
+            "385b14d7-ee97-4cc4-98bf-830859366b2d"
+          ],
+          "meshes": 294,
+          "visible": 294
+        },
+        {
+          "key": "MeshStandardMaterial+map",
+          "materials": [
+            "concreteSmooth",
+            "shell",
+            "shellWhite",
+            "grating",
+            "insulation",
+            "building",
+            "concrete",
+            "grass",
+            "gravel",
+            "asphalt"
+          ],
+          "meshes": 50,
+          "visible": 50
+        },
+        {
+          "key": "MeshBasicMaterial+transparent+doubleSide+additive",
+          "materials": [
+            "90e7032d-95ec-4daf-a367-4139765909cf",
+            "44044735-b38c-484a-806c-e27658915a84",
+            "c1551c67-c85e-4fe2-ad43-935ecc1284d8",
+            "078e103d-600d-47e0-ae4f-a09f9cfa7c8d",
+            "1c1f6862-477e-4887-9806-fdb6f1c1487b",
+            "231f8069-2771-4d6a-a06d-bc927a3e2edc",
+            "63ebbf8b-50f8-44ad-be1c-d03348a3adfd",
+            "507223c8-236a-49e4-860e-0d35a5d5ca5e",
+            "b42d637e-48ef-4e0e-b8b0-b5d905287266",
+            "04db53e9-52e3-4a97-abf9-761b5f8c6111",
+            "ba1ea592-a000-45bb-bdc7-f0423553cf57",
+            "66251c9c-d877-4356-b1a6-812fd371b3c4",
+            "32d0d315-a45b-40d3-b3a6-77065801a465"
+          ],
+          "meshes": 13,
+          "visible": 12
+        },
+        {
+          "key": "MeshBasicMaterial+transparent",
+          "materials": [
+            "172afe63-b63f-41da-aac6-aba228c09423",
+            "8d5729ab-9a07-4f19-8384-c6376718eaaa",
+            "3de55a88-3c0c-45c8-bd63-0ddfd2032435",
+            "83316ad3-4122-4fac-952a-a59f62bb0d14",
+            "bdd8b934-074b-45a2-afae-e7cd6c9befae",
+            "5cab6016-e696-4fc4-a64d-f97fe5aa0048",
+            "43557983-ae30-4e9b-9bcd-1676848ae232",
+            "e816a9e3-c03f-493f-90f5-99e60df58b87"
+          ],
+          "meshes": 8,
+          "visible": 8
+        },
+        {
+          "key": "MeshBasicMaterial",
+          "materials": [
+            "caeac924-f485-419a-a14f-2bd8b14b8e33",
+            "1094b634-3881-43e2-b2fd-eba50902dd26",
+            "7edb569a-8baa-4dbd-a795-00e084fe105c",
+            "eb7cfd21-a419-480f-ad05-225805767875",
+            "43a4aa1d-eb8d-4580-ac4b-7c40c3cb16ca",
+            "86ce77df-c522-4142-ba50-fca6850444c4",
+            "8073f10f-39e5-4855-be3e-0d86527b53cf",
+            "72641dc3-c8a3-453d-a800-c3bf480dc01d"
+          ],
+          "meshes": 8,
+          "visible": 8
+        },
+        {
+          "key": "ShaderMaterial+transparent+doubleSide+shader+additive",
+          "materials": [
+            "28c65901-2862-4211-983e-52e449e5c106",
+            "3611ef63-5be6-4cc0-b4aa-12c0f0128051",
+            "48a28250-fbe1-4127-8e12-9d23d91a5ff9",
+            "209e48d3-3f1b-407f-ae03-959870454bb9",
+            "91335a24-08bc-4f47-9869-c4dabc172499",
+            "12238e3c-b39f-467c-b928-38c62ac09303"
+          ],
+          "meshes": 6,
+          "visible": 6
+        },
+        {
+          "key": "ShaderMaterial+transparent+shader+additive",
+          "materials": [
+            "7aa0f195-746b-4b0e-8fec-3e3510d841d0",
+            "9a779aca-079e-4017-bfb4-525dd10fc348",
+            "512ead0c-057c-42a8-a9d6-86a25cfa48ef",
+            "b22b08c3-7bac-4637-9b68-d35badc68666",
+            "13819950-d137-44af-bcff-c5d525766591",
+            "7a8f79c4-7e13-453a-a9ca-b431df265db6"
+          ],
+          "meshes": 6,
+          "visible": 6
+        },
+        {
+          "key": "MeshStandardMaterial+emissive",
+          "materials": [
+            "beacon",
+            "lampWarm"
+          ],
+          "meshes": 2,
+          "visible": 2
+        },
+        {
+          "key": "MeshBasicMaterial+transparent+additive",
+          "materials": [
+            "flame",
+            "flameCore"
+          ],
+          "meshes": 2,
+          "visible": 2
+        },
+        {
+          "key": "ShaderMaterial+shader",
+          "materials": [
+            "90963d64-6cec-43f7-a33f-68dbc5670fb6"
+          ],
+          "meshes": 1,
+          "visible": 1
+        },
+        {
+          "key": "MeshStandardMaterial+map+emissiveMap+emissive",
+          "materials": [
+            "window"
+          ],
+          "meshes": 1,
+          "visible": 1
+        },
+        {
+          "key": "MeshStandardMaterial+transparent",
+          "materials": [
+            "glass"
+          ],
+          "meshes": 1,
+          "visible": 1
+        },
+        {
+          "key": "LineBasicMaterial+transparent",
+          "materials": [
+            "85b17c65-74f0-4f88-8a92-c64f91a5b08c"
+          ],
+          "meshes": 1,
+          "visible": 0
+        },
+        {
+          "key": "MeshBasicMaterial+map+transparent+vcolors",
+          "materials": [
+            "ab2cb3bb-fdca-431f-8cec-fac89b392d2d"
+          ],
+          "meshes": 1,
+          "visible": 1
+        }
+      ],
+      "meshes": 394,
+      "render": {
+        "calls": 583,
+        "triangles": 1043762,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 318,
+        "textures": 28
+      },
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)",
+      "parallelCompile": true,
+      "compileMode": "none",
+      "quality": "high"
+    }
+  },
+  "shots": {
+    "low": {
+      "mean": 115.5,
+      "clipPct": 0,
+      "perf": {
+        "fps": 56.1,
+        "calls": 671,
+        "triangles": 1045837,
+        "quality": "low",
+        "pixelRatio": 1,
+        "measuredLuma": 0.207,
+        "exposure": 0.925,
+        "ao": false,
+        "dof": false,
+        "fxaa": false,
+        "bloom": false,
+        "postfx": true
+      }
+    },
+    "aerial": {
+      "mean": 115.1,
+      "darkPct": 0,
+      "clipPct": 0,
+      "hist": [
+        0,
+        0,
+        4.7,
+        4.2,
+        4.1,
+        28.2,
+        15,
+        6.1,
+        7.7,
+        11.5,
+        13.3,
+        4.8,
+        0.4,
+        0,
+        0,
+        0
+      ],
+      "perf": {
+        "fps": 29.5,
+        "calls": 688,
+        "triangles": 1045949,
+        "quality": "high",
+        "pixelRatio": 1,
+        "measuredLuma": 0.461,
+        "exposure": 0.893,
+        "ao": true,
+        "dof": true,
+        "fxaa": true,
+        "bloom": true,
+        "postfx": true
+      },
+      "refMean": 115.6,
+      "delta": -0.5
+    },
+    "hero": {
+      "mean": 121.1,
+      "darkPct": 0.1,
+      "clipPct": 0,
+      "hist": [
+        0.2,
+        1.5,
+        1.7,
+        7.5,
+        8.7,
+        11.9,
+        8.3,
+        5.7,
+        18.8,
+        18.4,
+        12.8,
+        3.4,
+        0.9,
+        0.2,
+        0,
+        0
+      ],
+      "perf": {
+        "fps": 36,
+        "calls": 588,
+        "triangles": 1044538,
+        "quality": "high",
+        "pixelRatio": 1,
+        "measuredLuma": 0.492,
+        "exposure": 0.875,
+        "ao": true,
+        "dof": true,
+        "fxaa": true,
+        "bloom": true,
+        "postfx": true
+      },
+      "refMean": 123.1,
+      "delta": -2
+    },
+    "cdu": {
+      "mean": 113.2,
+      "darkPct": 0.1,
+      "clipPct": 0,
+      "hist": [
+        0.3,
+        3,
+        3.5,
+        8.8,
+        6.6,
+        15.4,
+        11.3,
+        9.5,
+        13.5,
+        13.1,
+        11.2,
+        2.6,
+        0.8,
+        0.3,
+        0.2,
+        0
+      ],
+      "perf": {
+        "fps": 35,
+        "calls": 264,
+        "triangles": 1031977,
+        "quality": "high",
+        "pixelRatio": 1,
+        "measuredLuma": 0.447,
+        "exposure": 0.905,
+        "ao": true,
+        "dof": true,
+        "fxaa": true,
+        "bloom": true,
+        "postfx": true
+      },
+      "refMean": 113,
+      "delta": 0.2
+    }
+  },
+  "gl": {},
+  "notes": [],
+  "quality": {
+    "low": {
+      "mean": 115.5,
+      "clipPct": 0,
+      "perf": {
+        "fps": 59.9,
+        "calls": 671,
+        "triangles": 1045837,
+        "quality": "low",
+        "pixelRatio": 1,
+        "measuredLuma": 0.207,
+        "exposure": 0.9,
+        "ao": false,
+        "dof": false,
+        "fxaa": false,
+        "bloom": false,
+        "postfx": true
+      }
+    },
+    "medium": {
+      "mean": 117.3,
+      "clipPct": 0,
+      "perf": {
+        "fps": 60,
+        "calls": 671,
+        "triangles": 1045837,
+        "quality": "low",
+        "pixelRatio": 1,
+        "measuredLuma": 0.208,
+        "exposure": 0.925,
+        "ao": false,
+        "dof": false,
+        "fxaa": false,
+        "bloom": false,
+        "postfx": true
+      }
+    },
+    "high": {
+      "mean": 115.6,
+      "clipPct": 0,
+      "perf": {
+        "fps": 38.5,
+        "calls": 688,
+        "triangles": 1045949,
+        "quality": "high",
+        "pixelRatio": 1,
+        "measuredLuma": 0.208,
+        "exposure": 0.9,
+        "ao": true,
+        "dof": true,
+        "fxaa": true,
+        "bloom": true,
+        "postfx": true
+      }
+    }
+  },
+  "flow": {
+    "anim": {
+      "active": false,
+      "overview": false,
+      "playing": true,
+      "cruise": true,
+      "speed": 1,
+      "stage": 0,
+      "stageElapsed": 0,
+      "time": 15.51,
+      "streams": [
+        {
+          "id": "crude",
+          "opacity": 0.32
+        },
+        {
+          "id": "vapor",
+          "opacity": 0.32
+        },
+        {
+          "id": "fcc",
+          "opacity": 0.32
+        },
+        {
+          "id": "reform",
+          "opacity": 0.32
+        },
+        {
+          "id": "product",
+          "opacity": 0.32
+        },
+        {
+          "id": "flare",
+          "opacity": 0.32
+        }
+      ]
+    },
+    "labels": [
+      {
+        "px": [
+          1309,
+          478
+        ],
+        "wpx": 239
+      },
+      {
+        "px": [
+          502,
+          592
+        ],
+        "wpx": 376
+      },
+      {
+        "px": [
+          891,
+          370
+        ],
+        "wpx": 316
+      },
+      {
+        "px": [
+          1129,
+          328
+        ],
+        "wpx": 259
+      },
+      {
+        "px": [
+          1222,
+          448
+        ],
+        "wpx": 317
+      },
+      {
+        "px": [
+          1516,
+          445
+        ],
+        "wpx": 262
+      },
+      {
+        "px": [
+          1001,
+          556
+        ],
+        "wpx": 400
+      },
+      {
+        "px": [
+          1130,
+          224
+        ],
+        "wpx": 227
+      }
+    ]
+  },
+  "equip": null,
+  "errors": []
+}

@@ -25,7 +25,7 @@ function wire(page) {
 async function ready(page, url) {
   const t0 = Date.now();
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 400000 });
-  await page.waitForFunction('window.__ready === true', { timeout: 400000, polling: 300 });
+  await page.waitForFunction('window.__ready === true && window.__fullReady === true', { timeout: 400000, polling: 300 });
   return +((Date.now() - t0) / 1000).toFixed(1);
 }
 async function shot(page, name, wait = 1100) {
