@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mark } from './prof.js';
+import { idbGet, idbSet, idbPrune, idbSupported } from './idb.js';
 
 /**
  * 优先下载 gzip 快照（2.9MB vs 20.5MB），用浏览器原生 DecompressionStream 解压；
@@ -8,13 +9,34 @@ import { mark } from './prof.js';
 export async function fetchSnapshot({
   binUrl = './assets/baked.bin',
   gzUrl = './assets/baked.bin.gz',
+  version = null,
 } = {}) {
+  const t0 = performance.now();
+  const stats = { source: 'network', ms: 0, bytes: 0, key: null, idb: idbSupported };
+  window.__cacheState = stats;
+  /* E1：IndexedDB 命中则完全跳过网络（版本变了 key 就变，自动失效） */
+  const key = version != null ? `${gzUrl.split('/').pop()}|v=${version}` : null;
+  stats.key = key;
+  if (key) {
+    const hit = await idbGet(key);
+    if (hit && hit.byteLength > 1e6) {
+      stats.source = 'idb';
+      stats.ms = +(performance.now() - t0).toFixed(1);
+      stats.bytes = hit.byteLength;
+      mark('bin-idb-hit');
+      return hit;
+    }
+  }
   if (typeof DecompressionStream !== 'undefined') {
     try {
       const res = await fetch(gzUrl, { cache: 'force-cache' });
       if (res.ok && res.body) {
         const stream = res.body.pipeThrough(new DecompressionStream('gzip'));
-        return await new Response(stream).arrayBuffer();
+        const buf = await new Response(stream).arrayBuffer();
+        stats.ms = +(performance.now() - t0).toFixed(1);
+        stats.bytes = buf.byteLength;
+        if (key) idbSet(key, buf).then(() => idbPrune('baked.bin.gz|', key));
+        return buf;
       }
     } catch (err) {
       console.warn('[baked] gzip 快照不可用，回退 baked.bin：', err.message);
@@ -22,7 +44,12 @@ export async function fetchSnapshot({
   }
   const binRes = await fetch(binUrl, { cache: 'force-cache' });
   if (!binRes.ok) throw new Error(`snapshot bin ${binRes.status}`);
-  return binRes.arrayBuffer();
+  const raw = await binRes.arrayBuffer();
+  stats.ms = +(performance.now() - t0).toFixed(1);
+  stats.bytes = raw.byteLength;
+  stats.source = 'network-bin';
+  if (key) idbSet(key, raw).then(() => idbPrune('baked.bin.gz|', key));
+  return raw;
 }
 
 /**

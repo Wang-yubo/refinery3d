@@ -15,6 +15,11 @@ import { createAnimation } from './animation.js';
 import { createExplorer } from './explorer.js';
 import { createShare } from './share.js';
 import { createAudio } from './audio.js';
+import { createExporters } from './exporters.js';
+import { createXray } from './xray.js';
+import { createProcessPanel } from './processpanel.js';
+import { createQrShare } from './qrshare.js';
+import { validateBalance } from './data/process.js';
 import { createTour } from './tour.js';
 import { createInteraction } from './interaction.js';
 import { createContactShadows } from './contacts.js';
@@ -183,6 +188,7 @@ const usePrebaked = params.get('procedural') !== '1' && params.get('prebaked') !
 const snapshotPromise = usePrebaked ? fetchSnapshot({
   binUrl: './assets/baked.bin',
   gzUrl: './assets/baked.bin.gz',
+  version: BAKED_META.bytes,
 }).catch((err) => { console.warn('[prebaked] 下载失败：', err.message); return null; }) : Promise.resolve(null);
 mark('snap-fetch-begin');
 
@@ -237,6 +243,44 @@ if (!plant) {
 if (!usingPrebaked) { addStructureDetails(plant, m); mark('details-added'); }
 scene.add(plant);
 window.__prebaked = usingPrebaked;
+
+/* ------------------------------------------------------------------ */
+/* E1：Service Worker（应用壳缓存；?sw=0 禁用，clean 截图不注册）          */
+/* ------------------------------------------------------------------ */
+if (!isClean && params.get('sw') !== '0' && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  const swToast = document.getElementById('sw-toast');
+  const swReload = document.getElementById('sw-reload');
+  const swClose = document.getElementById('sw-close');
+  const showSwToast = (show) => swToast?.classList.toggle('show', show);
+  swClose?.addEventListener('click', () => showSwToast(false));
+  swReload?.addEventListener('click', () => {
+    navigator.serviceWorker.controller?.postMessage('SKIP_WAITING');
+    location.reload();
+  });
+  const registerSw = () => {
+    navigator.serviceWorker
+      .register('./sw.js')
+      .then((reg) => {
+        window.__swState = { registered: true, active: !!reg.active, scope: reg.scope };
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw?.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) showSwToast(true);
+          });
+        });
+      })
+      .catch((err) => {
+        window.__swState = { registered: false, error: err.message };
+        console.warn('[sw] 注册失败：', err.message);
+      });
+  };
+  /* 注：main.js 有顶层 await（快照下载），load 事件可能早于本段执行，不能只依赖 load */
+  window.__swState = { registered: false, pending: true };
+  if (document.readyState === 'complete') registerSw();
+  else addEventListener('load', registerSw, { once: true });
+} else {
+  window.__swState = { registered: false, skipped: true };
+}
 
 mark('lights-start');
 // night point lights
@@ -730,6 +774,15 @@ function render() {
 
 function animate() {
   requestAnimationFrame(animate);
+  processPanel.update();
+  if (xray.root.visible) {
+    const now2 = performance.now();
+    if (now2 - (animate._xrayAt || 0) > 200) {
+      animate._xrayAt = now2;
+      const near = xray.nearest(camera);
+      if (xrayInfo && near) { xrayInfo.textContent = `透视 · ${near.label}`; xrayInfo.classList.add('show'); }
+    }
+  }
   const now = performance.now();
   const dt = Math.min(0.1, (now - lastFrame) / 1000);
   lastFrame = now;
@@ -1255,6 +1308,75 @@ weather = createWeather({
   getPreset: () => currentPreset,
   onClear: () => applyLook(currentPreset),
 });
+/* ------------------------------------------------------------------ */
+/* E2/E3/E4/E5：导出、参数面板、透视、二维码                              */
+/* ------------------------------------------------------------------ */
+const exporters = createExporters({ renderer, camera, composer, dofPass, renderFrame: render });
+const xray = createXray({ scene, m });
+const processPanel = createProcessPanel({
+  isClean,
+  getStage: () => (anim?.state ? anim.state.stage : 0),
+  getOverview: () => !!(anim?.state && anim.state.overview),
+});
+const qrShare = createQrShare({
+  getUrl: () => (share ? share.url() : location.href),
+  onCopy: () => { share?.copy(); },
+  isClean,
+});
+
+/* E2：导出 4K / 录制巡游 */
+const exportBtn = document.getElementById('export-btn');
+const recordBtn = document.getElementById('record-btn');
+function exportPngNow({ width = 3840, height = 2160 } = {}) {
+  return exporters.exportPNG({ width, height }).then((r) => {
+    exporters.download(r.dataUrl, `refinery-${width}x${height}.png`);
+    return r;
+  });
+}
+async function recordNow({ seconds = 30 } = {}) {
+  if (recordBtn) { recordBtn.classList.add('on'); recordBtn.textContent = '录制中 …'; }
+  const wasTour = tour?.isActive?.() ?? false;
+  if (!wasTour) (tour ? tour.start(0) : anim?.overview?.());
+  const tick = (t) => { if (recordBtn) recordBtn.textContent = `录制 ${t.left.toFixed(1)}s`; };
+  try {
+    const r = await exporters.recordTour({ seconds, fps: 30, onTick: tick });
+    exporters.download(r.blob, 'refinery-tour.webm');
+    return r;
+  } finally {
+    if (recordBtn) { recordBtn.classList.remove('on'); recordBtn.textContent = '录制巡游'; }
+    if (!wasTour) tour?.stop?.();
+  }
+}
+exportBtn?.addEventListener('click', () => { exportPngNow().catch((e) => console.warn('[export] ', e.message)); });
+recordBtn?.addEventListener('click', () => { recordNow().catch((e) => console.warn('[record] ', e.message)); });
+window.__exportPNG = (o) => exportPngNow(o);
+window.__recordTour = (o) => recordNow(o);
+
+/* E4：X-Ray（内构件叠加，关闭态逐像素等于基线） */
+const xrayBtn = document.getElementById('xray-btn');
+const xrayInfo = document.getElementById('xray-info');
+function setXray(on) {
+  const v = xray.setVisible(on);
+  xrayBtn?.classList.toggle('on', v);
+  if (!v) xrayInfo?.classList.remove('show');
+  return v;
+}
+window.__setXray = (on) => setXray(!!on);
+window.__xrayState = () => ({ on: xray.root.visible, spots: xray.spots.length });
+if (!isClean) {
+  xrayBtn?.addEventListener('click', () => setXray(!xray.root.visible));
+  addEventListener('keydown', (e) => {
+    if (e.key === 'x' || e.key === 'X') setXray(!xray.root.visible);
+  });
+  if (params.get('xray') === '1') setXray(true);
+  if (params.get('params') === '0') processPanel.setOpen(false);
+}
+
+/* E5：二维码 / 物料平衡数据 */
+document.getElementById('share-btn')?.addEventListener('click', () => qrShare.open());
+window.__qrState = () => ({ ...qrShare.state(), balance: validateBalance() });
+window.__processState = () => ({ ...processPanel.state(), data: validateBalance() });
+
 /* ------------------------------------------------------------------ */
 /* D2：环境音（默认静音；?audio=1 或记忆为开时，等首次手势再创建 ctx）    */
 /* ------------------------------------------------------------------ */
