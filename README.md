@@ -317,6 +317,10 @@ node tools/profile-startup.mjs --query "?shot=hero" --prep compile   # 指定机
 
 不改变画面观感与 17 张截图的构图：所有新 UI 都在 `?clean=1` 下隐藏，机位 / 曝光 / 后处理参数未动。
 
+![设备清单与小地图](renders/c/c1-explorer-minimap.png)
+![导览模式](renders/c/c3-tour.png)
+![分享链接](renders/c/c2-share.png)
+
 实测开销（1440×900、本机无头 Chrome，`__uiCost()`）：设备清单 + 小地图 0.11–0.27 ms/帧（占帧时 < 1.3%），导览稳定后 0.02 ms/帧（0.1%）；交叉 A/B 三次的帧时中位数在开关 UI 之间无可测差异（16.4/16.6/19.7 ms vs 16.7/20.9/20.1 ms）。重渲染的 aerial / hero / low / cdu 亮度均值与 A6b 基线分别差 0.00 / 0.00 / 0.00 / +0.10（clip 0%），即画面未变。
 
 - **C1 设备清单 + 搜索 + 小地图**（[`src/explorer.js`](src/explorer.js)）：右侧可折叠面板，35 台设备按 8 个单元分组（罐区 / 常减压 / 催化裂化 / 重整 / 公用工程 / 调和 / 装卸 / 总图），支持中文名、英文名、位号（`T-101`、`cdu-`）与单元名搜索；点击走 `__focusEquip` 同一入口，因此面板选中与 3D 选中 / 卡片联动。右下角 canvas 2D 小地图画厂区轮廓、设备 footprint、相机位置与朝向箭头、选中设备高亮，20 Hz 刷新（端到端延迟 < 100 ms）。`≤900 px` 默认折叠成 130 px 小条，展开后不与 `#bar` / `#hint` 重叠；`#animui` / `#flowui` 打开时自动隐藏。
