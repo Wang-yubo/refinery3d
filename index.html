@@ -190,6 +190,165 @@
   #equip .ebtns button:hover { border-color: rgba(120,210,255,0.7); color: #fff; background: rgba(20,40,58,0.8); }
   #equip #equip-focus { border-color: rgba(95,208,255,0.5); color: #5fd0ff; }
   body.clean #equip, body.clean #picktip { display: none !important; }
+
+  /* ---------- C1 设备清单 + 小地图 ---------- */
+  #explorer {
+    position: fixed; right: 42px; top: 146px; width: 306px; z-index: 23;
+    display: flex; flex-direction: column; max-height: min(52vh, 520px);
+    background: linear-gradient(160deg, rgba(10,23,35,0.84), rgba(5,12,20,0.78));
+    border: 1px solid rgba(120,190,225,0.2); border-radius: 4px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 18px 46px rgba(0,0,0,0.42);
+    font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif; color: #eaf4fb;
+    transition: width .2s ease, max-height .2s ease, background .2s ease;
+  }
+  #explorer.closed { width: 148px; max-height: 34px; overflow: hidden; }
+  #explorer.closed .xp-body { display: none; }
+  #explorer .xp-head {
+    display: flex; align-items: center; gap: 8px; padding: 9px 10px 8px 12px;
+    border-bottom: 1px solid rgba(120,190,225,0.12); flex: none;
+  }
+  #explorer.closed .xp-head { border-bottom: 0; }
+  #explorer .xp-title { font-size: 11px; letter-spacing: 2px; color: #cfe4f0; flex: 1; white-space: nowrap; }
+  #explorer .xp-title b { color: #5fd0ff; font-weight: 500; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  #explorer .xp-title em { font-style: normal; color: #6d8798; font-size: 9px; letter-spacing: 1px; margin-left: 6px; }
+  #explorer #xp-toggle {
+    width: 20px; height: 20px; border: 1px solid rgba(120,190,225,0.24); border-radius: 3px;
+    background: rgba(10,22,34,0.6); color: #9fc2d6; font-size: 10px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  #explorer #xp-toggle:hover { color: #fff; border-color: rgba(95,208,255,0.6); }
+  #explorer.closed #xp-toggle { transform: rotate(180deg); }
+  #explorer .xp-body { display: flex; flex-direction: column; min-height: 0; }
+  #explorer #xp-search {
+    margin: 9px 10px 7px; height: 27px; padding: 0 9px; flex: none;
+    background: rgba(4,10,16,0.7); border: 1px solid rgba(120,190,225,0.2); border-radius: 3px;
+    color: #e6f2fa; font: 11px "PingFang SC", sans-serif; letter-spacing: .5px; outline: none;
+  }
+  #explorer #xp-search::placeholder { color: #5f798a; }
+  #explorer #xp-search:focus { border-color: rgba(95,208,255,0.6); }
+  #explorer #xp-list { overflow-y: auto; padding: 0 6px 8px; min-height: 0; scrollbar-width: thin; }
+  #explorer #xp-list::-webkit-scrollbar { width: 6px; }
+  #explorer #xp-list::-webkit-scrollbar-thumb { background: rgba(120,190,225,0.22); border-radius: 3px; }
+  #explorer .xp-group { margin-top: 4px; }
+  #explorer .xp-ghead {
+    width: 100%; display: flex; align-items: center; gap: 7px; padding: 5px 6px;
+    background: none; border: 0; border-bottom: 1px solid rgba(120,190,225,0.1);
+    color: #8fb4c8; font: inherit; font-size: 10px; letter-spacing: 1.5px; cursor: pointer; text-align: left;
+  }
+  #explorer .xp-ghead:hover { color: #d9ecf7; }
+  #explorer .xp-gn { color: #cfe4f0; letter-spacing: 1.5px; }
+  #explorer .xp-ge { color: #5f798a; font-size: 8px; letter-spacing: 1px; flex: 1; }
+  #explorer .xp-ghead b { color: #5fd0ff; font-weight: 500; font-variant-numeric: tabular-nums; }
+  #explorer .xp-group.closed .xp-gbody { display: none; }
+  #explorer .xp-row {
+    width: 100%; display: block; text-align: left; padding: 5px 6px 6px 12px; margin: 1px 0;
+    background: none; border: 0; border-left: 2px solid transparent; border-radius: 2px;
+    color: #dceaf4; font: inherit; cursor: pointer; position: relative; transition: background .14s ease;
+  }
+  #explorer .xp-row i {
+    position: absolute; left: 4px; top: 9px; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--uc, #5fd0ff); opacity: .8;
+  }
+  #explorer .xp-row:hover { background: rgba(95,208,255,0.09); }
+  #explorer .xp-row.on { background: rgba(95,208,255,0.14); border-left-color: var(--uc, #5fd0ff); }
+  #explorer .xp-cn { display: block; font-size: 12px; letter-spacing: .5px; line-height: 1.35; }
+  #explorer .xp-meta { display: block; font-size: 9px; color: #6d8798; letter-spacing: .3px; line-height: 1.4; margin-top: 1px; }
+  #explorer #xp-list.empty::after {
+    content: '无匹配设备 / no match'; display: block; padding: 14px 8px; text-align: center;
+    font-size: 10px; letter-spacing: 1px; color: #5f798a;
+  }
+  #minimap-wrap {
+    position: fixed; right: 42px; bottom: 122px; z-index: 23; width: 224px;
+    background: linear-gradient(160deg, rgba(10,23,35,0.92), rgba(5,12,20,0.9));
+    border: 1px solid rgba(120,190,225,0.2); border-radius: 4px; overflow: hidden;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.4); pointer-events: none;
+  }
+  #minimap { display: block; width: 224px; height: 150px; }
+  #minimap-wrap .mm-cap {
+    display: block; padding: 4px 8px 5px; border-top: 1px solid rgba(120,190,225,0.12);
+    font: 9px "PingFang SC", sans-serif; letter-spacing: 1.6px; color: #6d8798;
+  }
+  body.clean #explorer, body.clean #minimap-wrap { display: none !important; }
+  body.anim #explorer, body.anim #minimap-wrap, body.flow #explorer, body.flow #minimap-wrap { display: none !important; }
+  @media (max-width: 900px) {
+    #explorer { right: 16px; top: 96px; width: 250px; max-height: 46vh; }
+    #explorer.closed { width: 132px; }
+    #minimap-wrap { right: 16px; bottom: 104px; width: 168px; }
+    #minimap { width: 168px; height: 112px; }
+  }
+  @media (max-width: 620px) { #minimap-wrap { display: none; } }
+
+  /* ---------- C2 分享按钮 ---------- */
+  #share-btn {
+    position: absolute; right: 132px; bottom: 82px; pointer-events: auto; cursor: pointer;
+    background: rgba(10,20,30,0.42); border: 1px solid rgba(120,190,225,0.2); color: #7f9db0;
+    padding: 5px 10px; border-radius: 3px; font-family: "PingFang SC", sans-serif;
+    font-size: 9px; letter-spacing: 1.5px; backdrop-filter: blur(8px);
+    transition: color .18s ease, border-color .18s ease;
+  }
+  #share-btn:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+  #tour-btn {
+    position: absolute; right: 214px; bottom: 82px; pointer-events: auto; cursor: pointer;
+    background: rgba(10,20,30,0.42); border: 1px solid rgba(120,190,225,0.2); color: #7f9db0;
+    padding: 5px 10px; border-radius: 3px; font-family: "PingFang SC", sans-serif;
+    font-size: 9px; letter-spacing: 1.5px; backdrop-filter: blur(8px);
+    transition: color .18s ease, border-color .18s ease;
+  }
+  #tour-btn:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+  body.clean #tour-btn, body.clean #share-btn, body.clean #share-toast { display: none !important; }
+  #share-toast {
+    position: fixed; left: 50%; bottom: 122px; transform: translate(-50%, 8px);
+    padding: 9px 16px; border-radius: 4px; background: rgba(6,14,22,0.92);
+    border: 1px solid rgba(95,208,255,0.4); color: #d9eefb;
+    font: 11px "PingFang SC", sans-serif; letter-spacing: 1px; z-index: 60;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.45);
+  }
+  #share-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- C3 导览模式 ---------- */
+  #tourui { display: none; }
+  body.tour #tourui {
+    display: block; z-index: 30; position: relative;
+    font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif; color: #eaf4fb;
+  }
+  body.tour #tourui .tpanel {
+    position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+    width: min(820px, 86vw); padding: 14px 20px 12px; pointer-events: auto;
+    background: linear-gradient(160deg, rgba(8,18,28,0.94), rgba(4,10,16,0.9));
+    border: 1px solid rgba(120,190,225,0.22); border-left: 2px solid var(--tcolor, #5fd0ff);
+    border-radius: 5px;
+    box-shadow: 0 22px 56px rgba(0,0,0,0.5);
+  }
+  body.tour #tourui .thead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  body.tour #tourui .tnum { font: 10px "SF Mono", Menlo, monospace; letter-spacing: 2px; color: var(--tcolor, #5fd0ff); }
+  body.tour #tourui .tdots { display: flex; gap: 5px; flex: 1; }
+  body.tour #tourui .tdots span {
+    cursor: pointer; font-size: 9px; letter-spacing: 1px; color: #5f798a;
+    border-top: 2px solid rgba(120,190,225,0.18); padding: 3px 6px 0; transition: color .2s ease, border-color .2s ease;
+  }
+  body.tour #tourui .tdots span.on { color: #eaf4fb; border-top-color: var(--tcolor, #5fd0ff); }
+  body.tour #tourui .tcn { font-size: 15px; line-height: 1.85; letter-spacing: .6px; color: #eaf4fb; min-height: 44px; }
+  body.tour #tourui .ten { margin-top: 5px; font-size: 9px; letter-spacing: 2px; color: #7f9cb0; text-transform: uppercase; }
+  body.tour #tourui .tbar { height: 2px; background: rgba(120,190,225,0.16); margin: 11px 0 9px; overflow: hidden; }
+  body.tour #tourui .tbar i { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: left center;
+    background: var(--tcolor, #5fd0ff); transition: transform .12s linear; will-change: transform; }
+  body.tour #tourui .tctl { display: flex; align-items: center; gap: 7px; }
+  body.tour #tourui .tctl button {
+    background: rgba(10,22,34,0.6); border: 1px solid rgba(140,190,220,0.24); color: #cfe4f0;
+    height: 26px; min-width: 30px; padding: 0 9px; border-radius: 3px; cursor: pointer;
+    font: 11px "PingFang SC", sans-serif; letter-spacing: 1px; transition: all .16s ease;
+  }
+  body.tour #tourui .tctl button:hover { border-color: rgba(95,208,255,0.62); color: #fff; }
+  body.tour #tourui .tctl button.on { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+  body.tour #tourui .tctl .gap { flex: 1; }
+  body.tour #tourui .tkeys { margin-left: 4px; font-size: 9px; letter-spacing: 1px; color: #5f798a; }
+  body.tour #hint, body.tour #quality-btn { display: none; }
+  body.clean #tourui { display: none !important; }
+  /* 导览时流程动画 HUD 一定不在（互斥），这里再兜一层 */
+  body.tour #animui, body.tour #flowui { display: none !important; }
+
 </style>
 </head>
 <body>
@@ -222,6 +381,8 @@
   </div>
   <div id="bar"></div>
   <div id="hint">点击设备查看参数 · 拖拽旋转 · 滚轮缩放<br/>1–9 切换机位 · 空格 播放 · ←/→ 阶段 · T 巡游</div>
+  <button id="tour-btn" title="导览模式：6 段自动讲解">导览</button>
+  <button id="share-btn" title="复制当前视角 / 画质 / 选中设备 / 动画进度的分享链接">分享链接</button>
   <button id="quality-btn" title="切换画质（high / mid / low）">画质 HIGH</button>
   <div id="perf"></div>
 </div>
@@ -238,6 +399,39 @@
   </div>
 </aside>
 <div id="picktip"><b id="picktip-cn"></b><span id="picktip-en"></span></div>
+<aside id="explorer">
+  <div class="xp-head">
+    <span class="xp-title">设备清单<em>EQUIPMENT</em><b id="xp-count">35</b></span>
+    <button id="xp-toggle" title="折叠 / 展开">▾</button>
+  </div>
+  <div class="xp-body">
+    <input id="xp-search" type="search" autocomplete="off" spellcheck="false"
+           placeholder="搜索：常压塔 / T-101 / column" />
+    <div id="xp-list"></div>
+  </div>
+</aside>
+<div id="minimap-wrap"><canvas id="minimap" width="224" height="150"></canvas><span class="mm-cap">厂区俯视 · MINIMAP</span></div>
+<div id="share-toast"></div>
+<div id="tourui">
+  <div class="tpanel">
+    <div class="thead">
+      <span class="tnum" id="tour-num">01 / 06</span>
+      <div class="tdots" id="tour-dots"></div>
+    </div>
+    <div class="tcn" id="tour-cn"></div>
+    <div class="ten" id="tour-en"></div>
+    <div class="tbar"><i id="tour-bar"></i></div>
+    <div class="tctl">
+      <button id="tour-prev" title="上一段">◀</button>
+      <button id="tour-play" title="播放 / 暂停">❚❚</button>
+      <button id="tour-next" title="下一段">▶</button>
+      <button id="tour-voice" title="语音朗读（浏览器 speechSynthesis）">语音 OFF</button>
+      <span class="gap"></span>
+      <span class="tkeys">空格 播放/暂停 · ←/→ 切换 · Esc 退出</span>
+      <button id="tour-close" title="退出导览">✕</button>
+    </div>
+  </div>
+</div>
 <div id="animui">
   <div class="apanel" id="apanel">
     <div class="ahead">

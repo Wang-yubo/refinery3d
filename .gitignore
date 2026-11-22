@@ -7,4 +7,5 @@ diag/
 # scratch diagnostics
 tools/*.png
 tools/verify-*.mjs
+!tools/verify-equip.mjs
 tools/timing-check.mjs

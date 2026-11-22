@@ -2,6 +2,7 @@
 // 与 A 批（renders/opt/stats.json）同机位对比，验证首帧渐进升级后画面零回退。
 // 用法：node tools/opt2-shots.mjs
 import puppeteer from 'puppeteer-core';
+import { CHROME, GL_ARGS } from './chrome.mjs';
 import fs from 'node:fs';
 import { decodePNG, stats } from './png.mjs';
 
@@ -10,10 +11,10 @@ const OUT = 'renders/opt2';
 fs.mkdirSync(OUT, { recursive: true });
 
 const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: CHROME,
   headless: 'new', protocolTimeout: 500000,
   args: ['--no-sandbox', '--disable-gpu-sandbox', '--hide-scrollbars',
-    `--user-data-dir=/tmp/dsh-chrome-opt2-${Date.now()}`, '--enable-unsafe-swiftshader', '--use-angle=metal'],
+    `--user-data-dir=/tmp/dsh-chrome-opt2-${Date.now()}`, ...GL_ARGS],
 });
 const errors = [];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

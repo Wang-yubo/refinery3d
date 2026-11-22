@@ -1,14 +1,15 @@
 import puppeteer from 'puppeteer-core';
+import { CHROME, GL_ARGS } from './chrome.mjs';
 import fs from 'node:fs';
 
 const shots = process.argv.slice(2);
 const list = shots.length ? shots : ['aerial'];
 const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: CHROME,
   headless: 'new',
   protocolTimeout: 240000,
   args: ['--no-sandbox', '--disable-gpu-sandbox', '--hide-scrollbars', '--user-data-dir=/tmp/dsh-chrome-shoot',
-         '--enable-unsafe-swiftshader', '--use-angle=metal', '--force-device-scale-factor=1'],
+         ...GL_ARGS, '--force-device-scale-factor=1'],
 });
 const page = await browser.newPage();
 await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });

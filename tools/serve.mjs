@@ -7,6 +7,7 @@ const types = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; char
 http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
   let file = path.join(root, url === '/' ? '/index.html' : url);
+  if (url.endsWith('/')) file = path.join(file, 'index.html'); // 子目录部署：/repo/ → /repo/index.html
   if (!file.startsWith(root)) { res.writeHead(403); return res.end('forbidden'); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('not found'); }

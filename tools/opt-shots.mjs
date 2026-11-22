@@ -1,6 +1,7 @@
 // A 批优化对比截图：renders/opt/a1..a6 + stats.json
 // 用法：node tools/opt-shots.mjs
 import puppeteer from 'puppeteer-core';
+import { CHROME, GL_ARGS } from './chrome.mjs';
 import fs from 'node:fs';
 import { decodePNG, stats } from './png.mjs';
 
@@ -8,10 +9,10 @@ const BASE = 'http://127.0.0.1:4321/';
 const OUT = 'renders/opt';
 fs.mkdirSync(OUT, { recursive: true });
 const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: CHROME,
   headless: 'new', protocolTimeout: 500000,
   args: ['--no-sandbox', '--disable-gpu-sandbox', '--hide-scrollbars',
-    `--user-data-dir=/tmp/dsh-chrome-opt-${Date.now()}`, '--enable-unsafe-swiftshader', '--use-angle=metal'],
+    `--user-data-dir=/tmp/dsh-chrome-opt-${Date.now()}`, ...GL_ARGS],
 });
 const errors = [];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -105,10 +106,10 @@ await shot(lowPage, 'a2-low');
 /* ---------------- prebaked（默认路径，独立 cold browser） ---------------- */
 await browser.close();
 const browser2 = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: CHROME,
   headless: 'new', protocolTimeout: 500000,
   args: ['--no-sandbox', '--disable-gpu-sandbox', '--hide-scrollbars',
-    `--user-data-dir=/tmp/dsh-chrome-opt6-${Date.now()}`, '--enable-unsafe-swiftshader', '--use-angle=metal'],
+    `--user-data-dir=/tmp/dsh-chrome-opt6-${Date.now()}`, ...GL_ARGS],
 });
 const p6 = await browser2.newPage();
 wire(p6);

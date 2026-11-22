@@ -9,6 +9,9 @@ import { createSky, createLights, createGround, createGroundLite, createHills, a
 import { createPlant, createPlantDecor } from './plant.js';
 import { bakeStatic } from './helpers.js';
 import { createAnimation } from './animation.js';
+import { createExplorer } from './explorer.js';
+import { createShare } from './share.js';
+import { createTour } from './tour.js';
 import { createInteraction } from './interaction.js';
 import { createContactShadows } from './contacts.js';
 import { QUALITY_LEVELS, detectQuality } from './quality.js';
@@ -30,7 +33,9 @@ let quality = qualityInfo.level;
 let Q = QUALITY_LEVELS[quality];
 const qualityForced = qualityInfo.forced;
 /* 截图 / 自动测试模式不自动降档，保证 renders 可复现 */
-const autoDowngrade = !qualityForced && !isClean && params.get('autoq') !== '0';
+let autoDowngrade = !qualityForced && !isClean && params.get('autoq') !== '0';
+/* 分享链接里显式带画质档时钉住，避免几秒后被自动降档改掉 */
+const pinQuality = (q) => { autoDowngrade = false; return q; };
 
 /* ------------------------------------------------------------------ */
 /* renderer / scene / camera                                           */
@@ -337,6 +342,9 @@ let statsEl = null;
 let statsVisible = params.get('stats') === '1';
 let perf = { fps: 0, calls: 0, triangles: 0 };
 let frameCount = 0;
+let explorerCostMs = 0;
+let tourCostMs = 0;
+let uiFrames = 0;
 let fpsWindowStart = performance.now();
 let lowFpsTime = 0;
 let autoQStart = 0;
@@ -540,6 +548,7 @@ function focusSunShadow(force = false) {
 
 function setShot(name) {
   if (interact) interact.cancel();
+  if (window.__tourActive) tour?.stop();
   if (name === 'process') {
     // 进入工艺流程动画模式
     currentShot = 'process';
@@ -548,7 +557,7 @@ function setShot(name) {
     anim.enter({ stage: 0, immediate: false });
     if (!isClean) {
       syncBar('process');
-      if (history.replaceState) history.replaceState(null, '', '?shot=process');
+      if (history.replaceState) { const u = new URL(location.href); u.searchParams.set('shot', 'process'); history.replaceState(null, '', u); }
     }
     return 'process';
   }
@@ -578,7 +587,7 @@ function setShot(name) {
 
   if (!isClean) {
     syncBar(name);
-    if (history.replaceState) history.replaceState(null, '', `?shot=${name}`);
+    if (history.replaceState) { const u = new URL(location.href); u.searchParams.set('shot', name); history.replaceState(null, '', u); }
   }
   return name;
 }
@@ -716,8 +725,15 @@ function animate() {
   const dt = Math.min(0.1, (now - lastFrame) / 1000);
   lastFrame = now;
   anim.update(dt);
+  const tTour = performance.now();
+  tour?.update(dt);
+  tourCostMs += performance.now() - tTour;
   controls.update();
   if (interact) interact.update(dt);
+  const tExp = performance.now();
+  explorer?.update(dt);
+  explorerCostMs += performance.now() - tExp;
+  uiFrames++;
 
   if (dofHold > 0) { dofHold -= dt; if (dofHold <= 0) updateDofState(); }
   focusSunShadow();
@@ -847,6 +863,8 @@ async function upgradeToFull() {
   mark('full-quality-done');
   applyLook(currentPreset);
   mark('full-look-done');
+  /* 分享链接的状态在完整画质就绪后落地，避免被 PMREM / 分档覆盖 */
+  try { share?.applyFromUrl(); } catch (err) { console.warn('[share] restore failed', err.message); }
   render();
   mark('full-render-done');
   fullReady = true;
@@ -1046,6 +1064,11 @@ window.__setContactShadows = (on = true) => { if (!contactShadows) return false;
 window.__setBloom = (on = true) => { if (!bloom) return false; bloom.enabled = !!on; render(); return bloom.enabled; };
 window.__setFXAA = (on = true) => { if (!fxaaPass) return false; fxaaPass.enabled = !!on; render(); return fxaaPass.enabled; };
 window.__setCinematic = (on = true) => { if (!cinematic) return false; cinematic.enabled = !!on; render(); return cinematic.enabled; };
+window.__setAutoExposure = (on = true) => {
+  autoExposureEnabled = !!on;
+  if (!on) { exposureScale = 1; renderer.toneMappingExposure = baseExposure; render(); }
+  return autoExposureEnabled;
+};
 window.__setExposure = (v = 1) => { exposureScale = 1; baseExposure = Number(v) || 1; renderer.toneMappingExposure = baseExposure; render(); return baseExposure; };
 window.__shadowInfo = () => ({
   mapSize: lights.sun.shadow.mapSize.toArray(),
@@ -1177,6 +1200,37 @@ if (prep !== 'none') {
   mark('prep-done');
 }
 
+/* ------------------------------------------------------------------ */
+/* C 批：设备清单 + 小地图 / 分享链接 / 导览模式                        */
+/* ------------------------------------------------------------------ */
+let explorer = null;
+let tour = null;
+let share = null;
+if (!isClean) {
+  explorer = createExplorer({ interact, camera, controls, isClean });
+  tour = createTour({ camera, controls, anim, interact, isClean });
+  share = createShare({
+    camera, controls, anim, interact,
+    getShot: () => currentShot,
+    setShot,
+    getQuality: () => quality,
+    applyQuality,
+    pinQuality,
+    isClean,
+  });
+} else {
+  // clean 截图模式也创建分享器（便于脚本调用 __shareUrl），但不显示按钮
+  share = createShare({
+    camera, controls, anim, interact,
+    getShot: () => currentShot,
+    setShot,
+    getQuality: () => quality,
+    applyQuality,
+    pinQuality,
+    isClean,
+  });
+}
+
 const initial = params.get('shot') || 'aerial';
 mark('set-shot-start');
 setShot(initial);
@@ -1230,6 +1284,41 @@ window.__debug = (opts = {}) => {
   render();
   return { fog, sky: skyOn, bloom: bloomOn, cinematic: cineOn };
 };
+/* ---- C 批 API ---- */
+window.__tourActive = false;
+window.__uiCost = () => {
+  const n = uiFrames || 1;
+  const exp = explorerCostMs / n;
+  const tour = tourCostMs / n;
+  const fps = perf.fps || 0;
+  const frameMs = fps > 0 ? 1000 / fps : null;
+  const pct = (ms) => (frameMs ? +((ms / frameMs) * 100).toFixed(2) : null);
+  return {
+    frames: uiFrames,
+    explorerMs: +exp.toFixed(3),
+    tourMs: +tour.toFixed(3),
+    frameMs: frameMs ? +frameMs.toFixed(2) : null,
+    explorerPct: pct(exp),
+    tourPct: pct(tour),
+  };
+};
+window.__uiCostReset = () => { explorerCostMs = 0; tourCostMs = 0; uiFrames = 0; return true; };
+window.__explorerState = () => (explorer ? explorer.state() : null);
+window.__explorerSearch = (q) => (explorer ? explorer.search(q) : null);
+window.__tourStart = (i = 0) => (tour ? tour.start(i) : null);
+window.__tourStop = () => (tour ? tour.stop() : null);
+window.__tourGoto = (i = 0) => (tour ? tour.goto(i) : null);
+window.__tourState = () => (tour ? tour.state() : null);
+window.__shareState = () => (share ? share.snapshot() : null);
+window.__shareUrl = () => (share ? share.url() : null);
+window.__applyShare = (x) => {
+  if (!share) return null;
+  const st = typeof x === 'string' ? JSON.parse(share.decode(x)) : x;
+  return share.apply(st);
+};
+window.__shareRestore = () => (share ? share.applyFromUrl() : null);
+window.__shareCopy = async () => (share ? share.copy() : null);
+
 window.__probe = () => {
   const pts = {
     site: [0, 0, 0], cduBase: [-48, 3, -30], cduTop: [-48, 56, -30], fcc: [90, 34, -80],

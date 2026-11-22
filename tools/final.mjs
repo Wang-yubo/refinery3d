@@ -1,12 +1,13 @@
 import puppeteer from 'puppeteer-core';
+import { CHROME, GL_ARGS } from './chrome.mjs';
 import fs from 'node:fs';
 import { decodePNG, stats, ascii } from './png.mjs';
 
 const shots = process.argv.slice(2);
 const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: CHROME,
   headless: 'new', protocolTimeout: 400000,
-  args: ['--no-sandbox','--disable-gpu-sandbox','--hide-scrollbars','--user-data-dir=/tmp/dsh-chrome-shoot','--enable-unsafe-swiftshader','--use-angle=metal'],
+  args: ['--no-sandbox','--disable-gpu-sandbox','--hide-scrollbars','--user-data-dir=/tmp/dsh-chrome-shoot',...GL_ARGS],
 });
 const page = await browser.newPage();
 await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });

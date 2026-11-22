@@ -3,6 +3,7 @@
 //   check  - 只做 API/像素自检，输出统计与诊断，不写 renders/
 //   render - 生成 renders/anim-01..06.png 与 renders/anim-overview.png（默认）
 import puppeteer from 'puppeteer-core';
+import { CHROME, GL_ARGS } from './chrome.mjs';
 import fs from 'node:fs';
 import { decodePNG, stats, ascii, colorMap } from './png.mjs';
 
@@ -11,10 +12,10 @@ const STAGE_COUNT = 6;
 const W = 1920, H = 1080;
 
 const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: CHROME,
   headless: 'new', protocolTimeout: 500000,
   args: ['--no-sandbox', '--disable-gpu-sandbox', '--hide-scrollbars',
-    '--user-data-dir=/tmp/dsh-chrome-anim', '--enable-unsafe-swiftshader', '--use-angle=metal'],
+    '--user-data-dir=/tmp/dsh-chrome-anim', ...GL_ARGS],
 });
 const page = await browser.newPage();
 await page.setViewport({ width: W, height: H, deviceScaleFactor: 1 });
@@ -151,6 +152,8 @@ const d12 = meanDiff(rImgs[1], rImgs[2]);
 console.log(`\n=== time diff 0->10: ${d01}  10->30: ${d12}`);
 
 /* ---------- replay determinism (same t twice) ---------- */
+/* 曝光自适应会让同一帧的曝光值缓慢漂移几 %，先钉住曝光再做重放对比 */
+await page.evaluate(() => { window.__setAutoExposure?.(false); });
 await page.evaluate(() => { window.__setAnimTime(21.5); window.__renderOnce(); });
 const detA = await grab('/tmp/animcheck/det-a.png');
 await page.evaluate(() => { window.__setAnimTime(3); window.__renderOnce(); });

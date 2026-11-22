@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'opt/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Setup Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Static server
+        run: |
+          node tools/serve.mjs . 4321 > /tmp/serve.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:4321/ && break || sleep 1
+          done
+          curl -sf -o /dev/null http://127.0.0.1:4321/ || (cat /tmp/serve.log && exit 1)
+
+      - name: Anim / geometry checks
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          SERVE_URL: http://127.0.0.1:4321/
+        timeout-minutes: 12
+        run: node tools/anim.mjs check
+
+      - name: Screenshot smoke (1 shot)
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          SERVE_URL: http://127.0.0.1:4321/
+        timeout-minutes: 12
+        run: node tools/final.mjs hero
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts
+          path: |
+            renders/hero.png
+            diag/*.json
+            diag/*.txt
+            /tmp/serve.log
+          if-no-files-found: warn
+          retention-days: 7

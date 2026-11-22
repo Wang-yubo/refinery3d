@@ -45,7 +45,37 @@ node tools/serve.mjs . 4321
 - 鼠标拖拽旋转、滚轮缩放、右键平移
 - 数字键 `1`–`9` 或底部按钮切换机位
 - 点击设备查看参数，详见下节
-- URL 参数：`?shot=night` 指定初始机位、`?clean=1` 隐藏界面（用于截图）
+- **设备清单**（右侧）：35 台设备按罐区 / 常减压 / 催化裂化 / 重整 / 公用工程 / 调和 / 装卸分组，支持中文名、英文名、位号（如 `T-101`）搜索；回车聚焦第一项
+- **小地图**（右下）：厂区俯视轮廓、相机位置与朝向、当前选中设备高亮，20 Hz 刷新
+- **导览**（右下「导览」按钮）：6 段自动讲解 + 中英字幕，可播放 / 暂停 / 上一段 / 下一段，可开语音朗读（默认关闭）
+- **分享链接**（「分享链接」按钮）：把机位、相机位姿、画质档、选中设备、动画阶段与时间编码进 URL，复制后打开即还原
+- URL 参数见下节表格
+
+## URL 参数
+
+| 参数 | 取值 | 说明 |
+| --- | --- | --- |
+| `shot` | `aerial` / `hero` / `cdu` / `tanks` / `fcc` / `night` / `flow` / `day` / `top` / `process` | 初始机位；`process` 直接进入工艺流程动画 |
+| `q` | `high` / `mid` / `low` | 强制画质档（同时关闭自动降档） |
+| `clean` | `1` | 隐藏全部 HUD（截图用）；设备清单 / 小地图 / 分享 / 导览一并隐藏 |
+| `stats` | `1` | 显示性能面板（等价于按 `P`） |
+| `autoq` | `0` | 关闭「连续 5 s FPS < 35 自动降一档」 |
+| `procedural` | `1` | 跳过烘焙快照，改为实时程序化建模（约慢 14 s，用于对比 / 兜底） |
+| `prebaked` | `0` | 同上（等价写法） |
+| `prep` | `compile` / `compileasync` | 首帧前显式 `renderer.compile` / `compileAsync`（冷启动实验用） |
+| `anim` | `1` | 直接进入工艺流程动画；配合 `stage` / `t` / `playing` / `cruise` |
+| `stage` | `0`–`5` | 动画起始阶段 |
+| `playing` | `0` / `1` | 动画是否自动播放（默认播放） |
+| `cruise` | `1` | 进入后开启相机自动巡游 |
+| `t` | 秒 | 动画起始时间 |
+| `labels` | `1` | 强制显示流程标签（`?anim=1` 时） |
+| `dof` | `1` / `0` | 强制开启 / 关闭景深 |
+| `autoexposure` | `0` | 关闭自动曝光（锁定在预设曝光） |
+| `prebaked` | `1` / `0` | 默认开启烘焙快照；`0` 等同 `procedural=1` |
+| `profile` | `1` | 包装 `gl.linkProgram` / `compileShader` 做启动诊断 |
+| `st` | base64url | 分享链接状态（机位 / 相机位姿 / 画质 / 选中设备 / 动画阶段与时间），见「分享链接」 |
+
+> `?st=` 与上述参数兼容：机位、画质由链接里的值覆盖，其余参数（`clean`、`procedural`、`stats`…）保持不变。
 
 ## 画质与性能（A 批优化）
 
@@ -58,19 +88,6 @@ node tools/serve.mjs . 4321
 | **low** | 1.2 | 512² | 关 | 关 | 关 | 关 | 关 | 2 |
 
 自动选择规则：`hardwareConcurrency <= 4` 或 `devicePixelRatio > 2` → low；触屏 / 窄屏（< 1024 或高 < 720）→ mid；其余桌面 → high。右下角「画质 HIGH」小按钮可在三档间循环，`clean=1` 截图模式自动隐藏。
-
-### URL 参数
-
-| 参数 | 说明 |
-| --- | --- |
-| `?q=high / mid / low` | 强制画质档位；显式指定时禁用自动降档 |
-| `?stats=1` | 左上角显示 FPS / draw calls / triangles / 档位面板；按 `P` 切换 |
-| `?prebaked=1` | 加载构建期烘焙几何快照（默认开启） |
-| `?procedural=1` | 回退到实时程序化建模 + `bakeStatic`（兼容/调试） |
-| `?dof=1` / `?dof=0` | 强制开启 / 关闭景深 |
-| `?autoexposure=0` | 关闭自动曝光（曝光锁定在预设值） |
-| `?autoq=0` | 关闭 FPS 自动降档 |
-| `?clean=1` | 隐藏 HUD，用于可复现截图（同时禁用自动降档） |
 
 ### 性能数据（本机无头 Chrome + ANGLE Metal，1920×1080）
 
@@ -105,19 +122,98 @@ node tools/serve.mjs . 4321
 
 ### 程序化 API
 
+**状态 / 就绪**
+
 | API | 说明 |
 | --- | --- |
-| `window.__quality` | 当前档位 |
-| `window.__setQuality(q)` | 切换档位并重建 render target 尺寸，返回当前档位 |
-| `window.__perf()` | `{fps, calls, triangles, quality, pixelRatio, ao, dof, fxaa, bloom, exposure}` |
-| `window.__setStats(on)` | 显示 / 隐藏性能面板 |
-| `window.__bench(n)` | 同步渲染 n 帧，返回 `msPerFrame` / `fps`（绕过 vsync） |
+| `window.__ready` / `__readyAt` | 轻量首帧可交互；就绪时的 `performance.now()` |
+| `window.__fullReady` / `__fullReadyAt` | 完整画质（装饰 + PMREM + postFX + 完整档位）就绪；时间为对应时刻 |
+| `window.__upgradeFull()` | 手动触发完整画质升级（幂等） |
+| `window.__animReady` / `__equipReady` / `__prebaked` | 动画 / 交互 / 烘焙快照路径是否就绪 |
+
+**画质 / 后处理**
+
+| API | 说明 |
+| --- | --- |
+| `window.__quality` | 当前档位（`high` / `mid` / `low`） |
+| `window.__setQuality(q)` | 切档并重建 render target 尺寸，返回当前档位 |
+| `window.__qualityInfo()` | 各档位参数表 + 当前档 |
 | `window.__setDof(on)` | 强制景深开关 |
-| `window.__setAO(on)` / `__setContactShadows(on)` / `__setBloom(on)` / `__setFXAA(on)` | 分项调试开关 |
-| `window.__shadowInfo()` | 当前阴影相机尺寸、贴图大小与焦点 |
+| `window.__setAO(on)` | SSAO 开关 |
+| `window.__setContactShadows(on)` | 接触阴影开关 |
+| `window.__setBloom(on)` | Bloom 开关 |
+| `window.__setFXAA(on)` | FXAA 开关 |
+| `window.__setCinematic(on)` | 电影感后处理开关 |
+| `window.__setExposure(v)` | 固定曝光（关闭自适应） |
+| `window.__shadowInfo()` | 阴影相机尺寸、贴图大小与焦点 |
+| `window.__setStats(on)` / `window.__perf()` | 性能面板；`{fps, calls, triangles, quality, pixelRatio, ao, dof, fxaa, bloom, exposure}` |
+
+**相机 / 机位**
+
+| API | 说明 |
+| --- | --- |
+| `window.__shots` | 机位名数组（`['aerial', 'hero', …]`，共 9 个） |
+| `window.__setShot(name)` | 切机位（`process` = 工艺流程动画），返回 `{shot, labels, quality}` |
+| `window.__setCam({pos, target, fov})` | 直接设置相机位姿 |
+| `window.__project([x,y,z])` | 世界坐标 → 屏幕像素（用于校验构图） |
+| `window.__probe()` | 关键设备投影点位（回归测试用） |
+
+**设备 / 交互**
+
+| API | 说明 |
+| --- | --- |
+| `window.__equipList()` | 35 台设备清单 `{id, cn, en, unit, kind, x, y, z, w, h, d}` |
+| `window.__focusEquip(id, immediate?)` | 选中设备并聚焦机位（设备清单点击走同一入口） |
+| `window.__selectEquip(id)` | 只选中不移动相机 |
+| `window.__equipState()` | `{selected, hover, card, tween, camera, target}` |
+| `window.__equipClose()` | 关闭设备卡片 / 取消选中 |
+| `window.__explorerState()` | 设备清单状态：`{items, groups, query, visible, selected, visibleRows, minimap}` |
+| `window.__explorerSearch(q)` | 以代码驱动搜索框，返回命中条数 |
+
+**工艺流程动画**
+
+| API | 说明 |
+| --- | --- |
+| `window.__setStage(i)` | 跳到第 i 阶段（0–5） |
+| `window.__setAnimTime(t)` | 设置动画时间（秒），返回新时间 |
+| `window.__playAnim()` / `__pauseAnim()` | 播放 / 暂停 |
+| `window.__setAnimSpeed(x)` / `__setCruise(b)` | 倍速 / 自动巡游 |
+| `window.__animOverview()` | 全流程总览机位 |
+| `window.__animState()` | `{active, overview, playing, cruise, speed, stage, stageElapsed, time, streams}` |
+| `window.__flowInfo()` / `__labelProbe()` | 流线状态 / 标签屏幕位置（回归测试用） |
+
+**导览 / 分享（C 批）**
+
+| API | 说明 |
+| --- | --- |
+| `window.__tourStart(i)` | 开始导览（可指定起始段） |
+| `window.__tourStop()` | 结束导览 |
+| `window.__tourGoto(i)` | 跳到第 i 段 |
+| `window.__tourState()` | `{active, index, stage, playing, voice, elapsed, total, subtitle}` |
+| `window.__tourActive` | 导览是否进行中（与工艺流程动画互斥） |
+| `window.__shareState()` | 当前状态的分享快照对象 |
+| `window.__shareUrl()` | 生成分享链接（含 `?st=`），长度约 180–220 字符 |
+| `window.__shareCopy()` | 复制到剪贴板，返回 `{url, len}` |
+| `window.__applyShare(stateOrRaw)` / `__shareRestore()` | 应用分享状态 / 从当前 URL 的 `?st=` 恢复 |
+
+**诊断（A6b）**
+
+| API | 说明 |
+| --- | --- |
 | `window.__renderInfo()` | 程序数 / 按材质分组 / render 统计 / 显存 / GPU 与 `KHR_parallel_shader_compile` |
 | `window.__timing()` | 冷启动分段 `perf.mark` 列表（含 GL 链路耗时汇总） |
-| `window.__fullReady` | 完整画质（装饰 / PMREM / postFX / 完整档位）是否就绪 |
+| `window.__uiCost()` / `__uiCostReset()` | C 批 UI（清单 + 小地图 + 导览）每帧耗时统计 |
+| `window.__bench(n)` | 同步渲染 n 帧，返回 `msPerFrame` / `fps`（绕过 vsync） |
+| `window.__benchDirect(n)` | 不走 composer 的直接渲染基准 |
+| `window.__benchReal()` | 真实（含 composer）帧耗时 |
+| `window.__benchViews()` | 视图 / 相机创建基准 |
+| `window.__compileProbe(mode)` | program 生成探测（`compile` / `compileAsync`） |
+| `window.__progBench(n)` | 单 program 生成耗时基准 |
+| `window.__pmremBench()` | PMREM 环境图生成基准 |
+| `window.__snapProfile()` | 烘焙快照重建分段耗时 |
+| `window.__renderOnce()` / `__debug` / `__occlude` | 手动重绘 / 调试句柄 / 遮挡探测 |
+| `window.__scene` / `__camera` / `__renderer` / `__composer` / `__materials` / `__clay` / `__spot` | 场景对象句柄（控制台调试用，不保证跨版本稳定） |
+| `window.__buildSnapshot` / `__snapshotBuffer` / `__snapshotChunk` | 烘焙快照构建的内部入口（预烘焙工具用） |
 
 ### A 批改动
 
@@ -216,6 +312,85 @@ node tools/profile-startup.mjs --query "?shot=hero" --prep compile   # 指定机
 | [\`renders/opt2/a6b-low.png\`](renders/opt2/a6b-low.png) | low 档 1920×1080 | 115.5 |
 
 均值 / 暗部占比 / 过曝占比 / 性能 / 冷启动分段见 [\`renders/opt2/stats.json\`](renders/opt2/stats.json)；\`node tools/opt2-shots.mjs\` 可重新生成（同时校验与 A 批的均值偏差 ≤ ±5、clip < 1%）。
+
+### C 批改动（交互与交付）
+
+不改变画面观感与 17 张截图的构图：所有新 UI 都在 `?clean=1` 下隐藏，机位 / 曝光 / 后处理参数未动。
+
+实测开销（1440×900、本机无头 Chrome，`__uiCost()`）：设备清单 + 小地图 0.11–0.27 ms/帧（占帧时 < 1.3%），导览稳定后 0.02 ms/帧（0.1%）；交叉 A/B 三次的帧时中位数在开关 UI 之间无可测差异（16.4/16.6/19.7 ms vs 16.7/20.9/20.1 ms）。重渲染的 aerial / hero / low / cdu 亮度均值与 A6b 基线分别差 0.00 / 0.00 / 0.00 / +0.10（clip 0%），即画面未变。
+
+- **C1 设备清单 + 搜索 + 小地图**（[`src/explorer.js`](src/explorer.js)）：右侧可折叠面板，35 台设备按 8 个单元分组（罐区 / 常减压 / 催化裂化 / 重整 / 公用工程 / 调和 / 装卸 / 总图），支持中文名、英文名、位号（`T-101`、`cdu-`）与单元名搜索；点击走 `__focusEquip` 同一入口，因此面板选中与 3D 选中 / 卡片联动。右下角 canvas 2D 小地图画厂区轮廓、设备 footprint、相机位置与朝向箭头、选中设备高亮，20 Hz 刷新（端到端延迟 < 100 ms）。`≤900 px` 默认折叠成 130 px 小条，展开后不与 `#bar` / `#hint` 重叠；`#animui` / `#flowui` 打开时自动隐藏。
+- **C2 分享链接**（[`src/share.js`](src/share.js)）：`snapshot()` 序列化 `{机位, 相机位姿, fov, 画质档, 选中设备, 动画阶段+时间}` → JSON → base64url，写进 `?st=`（实测 177–202 字符，< 2 KB）。「分享链接」按钮复制到剪贴板（失败回退 `execCommand` / `prompt`）。打开链接时在 `__fullReady` 之后落地，避免被 PMREM / 分档覆盖；链接里带画质档时会钉住该档、不再被自动降档改掉。
+- **C3 导览模式**（[`src/tour.js`](src/tour.js)）：复用工艺流程 6 个阶段与 `STAGES[i].cam`，逐段 1.8 s 推镜 + 13 s 停留，底部字幕条同步中英文讲解与进度条；播放 / 暂停 / 上一段 / 下一段 / 段点点击 / Esc 退出；可选 `speechSynthesis` 中文朗读（默认关闭，按钮切换）。进入导览会 `anim.exit()` 并关掉巡游，切任意机位或进入工艺流程动画会自动退出导览（双向互斥）。
+- **C4 一键冒烟 + CI**：[`tools/check-all.mjs`](tools/check-all.mjs) 依次跑 截图抽检（3 张）/ 动画校验 / 设备拾取 / opt2 画质对比，输出 `diag/check-all.json` 与 `diag/check-all.txt`，任一步失败非零退出；[`.github/workflows/ci.yml`](.github/workflows/ci.yml) 在 ubuntu + setup-chrome 上跑轻量版（anim check + 1 张截图）并上传 artifacts。Chrome 路径与 ANGLE 参数统一由 [`tools/chrome.mjs`](tools/chrome.mjs) 提供（`CHROME_PATH` 可覆盖，Linux 不传 `--use-angle=metal`）。
+- **C5 部署与文档**：本文件补齐 URL 参数表、API 表、静态部署与目录结构；仓库根目录加 `.nojekyll`，可直接作为 GitHub Pages / 任意静态站点的子目录发布。
+- **C6 代码结构（未做）**：`src/animation.js` 拆分（`data/stages.js` / `flow.js` / `tour.js` / `hud.js`）与 `data/layout.json` 抽离本轮未实施——收益只是可维护性，改动面覆盖 1000+ 行且要重跑全部像素回归，按「时间不够可只做数据抽离、不强行拆文件」的约定留到下一批。
+
+### 一键冒烟 / CI
+
+```bash
+node tools/check-all.mjs            # 全量：截图抽检 + 动画校验 + 设备拾取 + opt2 对比（约 8–10 分钟）
+node tools/check-all.mjs --quick    # 跳过 opt2（约 4 分钟）
+node tools/check-all.mjs --only anim,equip
+cat diag/check-all.txt              # 文本报告；JSON 见 diag/check-all.json
+```
+
+任一步失败会打印该步最后几行输出与命中的 `error` 行，并以非零码退出；CI 里可直接作为门禁。
+
+另有 C 批专项回归（设备清单 / 搜索 / 小地图 / 分享链接往返 / 导览 / clean 与窄屏）：
+
+```bash
+node tools/verify-c.mjs            # 约 2 分钟，输出逐项 ✔/✘，任一失败非零退出
+node tools/check-docs.mjs          # 核对 README 里的 API / URL 参数与源码一致
+```
+
+> 注意：`check-all` 与截图类工具会重写 `renders/` 下的 PNG 与 `diag/`，提交前用 `git checkout -- renders` 还原以免噪音 diff。
+
+### 静态部署
+
+纯静态、无构建步骤、无 CDN，所有资源都是相对路径（`./src`、`./vendor`、`./assets`）：
+
+```bash
+# 任意静态服务器都行（子目录部署同样可用）
+node tools/serve.mjs . 8080              # 自带零依赖服务器（推荐，支持 gzip 快照）
+python3 -m http.server 8080              # 或任意 python/http-server/nginx
+npx serve .                              # 或任意静态托管 CLI
+```
+
+**GitHub Pages**：把仓库根目录作为站点根发布即可（根目录已有 `.nojekyll`，避免 Jekyll 忽略 `_*` 与目录索引）。
+子目录部署（`https://user.github.io/repo/`）无需改任何路径；`assets/baked.bin.gz` 若被托管平台按扩展名处理，浏览器端 `DecompressionStream('gzip')` 仍会正确解压，失败时自动回退到 `assets/baked.bin`。
+
+> 为什么必须用 HTTP：ES Module + importmap 不能用 `file://` 打开。
+
+### 目录结构
+
+```text
+refinery3d/
+├── index.html              # 页面骨架 + 全部 HUD CSS（HUD / 流程条 / 设备卡 / 导览字幕 / 清单 / 小地图）
+├── src/
+│   ├── main.js             # 引导、渲染循环、机位、画质分档、C 批 UI 装配、window.__ API
+│   ├── environment.js      # 天空 / 灯光 / 地面 / 远山 / 环境预设
+│   ├── units.js            # 常减压 / 催化裂化 / 重整 / 罐区 / 公用工程等装置建模
+│   ├── plant.js            # 装置总装、标签、夜间光晕、装饰（蒸汽 / 风扇 / 罐车）
+│   ├── materials.js        # 材质库 + 程序合并（constrainPrograms）
+│   ├── textures.js         # 程序化 canvas 纹理
+│   ├── helpers.js          # 几何辅助（box / plane / 合并 / bakeStatic）
+│   ├── animation.js        # 工艺流程动画：6 阶段、流线、环、HUD、相机巡游
+│   ├── explorer.js         # C1 设备清单 + 搜索 + 小地图
+│   ├── share.js            # C2 分享链接状态序列化
+│   ├── tour.js             # C3 导览模式（字幕 / 语音 / 播放控制）
+│   ├── interaction.js      # 设备代理拾取、卡片、聚焦机位（35 台）
+│   ├── postfx.js           # SSAO / Bloom / DOF / FXAA / 电影感后处理
+│   ├── quality.js          # 三档画质参数与自动探测
+│   ├── prebaked.js         # 烘焙快照下载（gzip）+ 零拷贝重建
+│   ├── bakedMeta.js        # 构建期内联的几何元数据
+│   └── prof.js             # 冷启动打点 / GL 链路包装 / __renderInfo
+├── vendor/                 # three.js r160 + addons（仓库内，无 CDN）
+├── assets/                 # baked.bin / baked.bin.gz / 环境贴图源
+├── tools/                  # serve / 截图 / 动画校验 / 拾取校验 / 冒烟 / 打包 / 冷启动 profiling
+├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b）
+└── .github/workflows/ci.yml
+```
 
 ### 重新生成预烘焙快照
 
