@@ -1,8 +1,12 @@
 name: Pages
 
+# 当前仓库 Pages 的发布源是「Deploy from a branch」（main 根目录），由 GitHub 自带的
+# 「pages build and deployment」自动发布，本工作流不参与，避免重复部署产生失败记录。
+# 若要切换为 Actions 部署：Settings → Pages → Source 选「GitHub Actions」，
+# 并取消下面 push 触发器的注释，由本工作流接管发布。
 on:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 permissions:

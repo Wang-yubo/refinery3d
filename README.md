@@ -536,8 +536,9 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 
 #### E5 GitHub Pages + 二维码分享
 
-- [`.github/workflows/pages.yml`](.github/workflows/pages.yml)：`rsync` 组装 `_site`（排除 `node_modules` / `diag` / `.git` / `.github`）→ `actions/configure-pages` → `upload-pages-artifact` → `deploy-pages`，仅在 `main` 推送或手动触发。
-- 启用方式：仓库 **Settings → Pages → Source: GitHub Actions**（一步），之后站点为 `https://<user>.github.io/refinery3d/`。全站引用都是相对路径，子路径不需要改写。
+- [`.github/workflows/pages.yml`](.github/workflows/pages.yml)：`rsync` 组装 `_site`（排除 `node_modules` / `diag` / `.git` / `.github`）→ `actions/configure-pages` → `upload-pages-artifact` → `deploy-pages`。
+- 当前仓库 Pages 的发布源是 **Deploy from a branch**（`main` 根目录），GitHub 自带工作流会自动发布到 `https://<user>.github.io/refinery3d/`；`pages.yml` 因此默认只保留 `workflow_dispatch` 手动触发，避免重复部署。
+- 若要改用 Actions 部署：**Settings → Pages → Source: GitHub Actions**，并取消 `pages.yml` 里 `push` 触发器的注释。全站引用都是相对路径，子路径不需要改写。
 - 二维码：vendored [`vendor/qrcode-generator.js`](vendor/qrcode-generator.js)（1.4.4，MIT，见 `vendor/qrcode-generator.LICENSE.md`，**不走 CDN**）；「分享链接」按钮弹出 [`src/qrshare.js`](src/qrshare.js) 弹层：当前分享链接的二维码 + 链接文本 + 复制按钮，`?clean=1` 隐藏。
 
 | 验收 | 结果 |
