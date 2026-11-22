@@ -6,8 +6,9 @@ const port = Number(process.argv[3] || 4321);
 const types = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.css':'text/css', '.png':'image/png', '.jpg':'image/jpeg', '.json':'application/json' };
 http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
-  let file = path.join(root, url === '/' ? '/index.html' : url);
-  if (url.endsWith('/')) file = path.join(file, 'index.html'); // 子目录部署：/repo/ → /repo/index.html
+  // '/' 与子目录结尾 '/repo/' 都落到 index.html
+  const rel = url === '/' ? 'index.html' : (url.endsWith('/') ? url + 'index.html' : url);
+  const file = path.join(root, rel);
   if (!file.startsWith(root)) { res.writeHead(403); return res.end('forbidden'); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
