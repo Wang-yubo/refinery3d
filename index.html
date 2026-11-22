@@ -361,6 +361,116 @@
   body.tour #animui, body.tour #flowui { display: none !important; }
 
 </style>
+  <style>
+    /* E1：SW 新版本提示 */
+    #sw-toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+      display: none; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 4px;
+      background: rgba(10,20,30,0.86); border: 1px solid rgba(95,208,255,0.45); color: #d7e7f2;
+      font-family: "PingFang SC", sans-serif; font-size: 12px; letter-spacing: 0.5px;
+      backdrop-filter: blur(10px); z-index: 60;
+    }
+    #sw-toast.show { display: flex; }
+    #sw-toast button {
+      background: rgba(95,208,255,0.14); border: 1px solid rgba(95,208,255,0.55); color: #5fd0ff;
+      padding: 3px 9px; border-radius: 3px; cursor: pointer; font-size: 11px;
+    }
+    body.clean #sw-toast { display: none !important; }
+
+    /* E3：工艺参数面板（玻璃拟态，左侧，避开 #animui 右侧面板与 #bar） */
+    #process-panel {
+      position: fixed; left: 42px; top: 150px; width: 286px; z-index: 22;
+      display: none; flex-direction: column; gap: 9px; padding: 14px 16px 12px;
+      background: linear-gradient(155deg, rgba(10,23,35,0.82), rgba(5,12,20,0.74));
+      border: 1px solid rgba(120,190,225,0.2); border-radius: 4px;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 18px 46px rgba(0,0,0,0.42);
+      font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      color: #d7e7f2; font-size: 12px; max-height: min(46vh, 430px); overflow: hidden;
+    }
+    #process-panel.open { display: flex; }
+    #process-panel .pp-head { display: flex; justify-content: space-between; align-items: baseline; letter-spacing: 1.4px; font-size: 10px; color: #7f9db0; text-transform: uppercase; }
+    #process-panel .pp-head em { font-style: normal; color: #ffd27a; opacity: 0.8; letter-spacing: 0.5px; }
+    #process-panel .pp-stage { font-size: 15px; letter-spacing: 1.2px; color: #eaf4fb; }
+    #process-panel .pp-rows { display: flex; flex-direction: column; gap: 4px; }
+    #process-panel .pp-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dashed rgba(120,190,225,0.12); }
+    #process-panel .pp-row span { color: #7f95a6; }
+    #process-panel .pp-row b { font-weight: 500; color: #bfe6ff; letter-spacing: 0.4px; }
+    #process-panel .pp-balance { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+    #process-panel .pb-head { font-size: 10px; color: #7f9db0; letter-spacing: 1px; display: flex; justify-content: space-between; gap: 8px; }
+    #process-panel .pb-head em { font-style: normal; color: #5c7488; font-size: 9px; letter-spacing: 0; }
+    #process-panel .pb-row { position: relative; display: flex; align-items: baseline; gap: 6px; padding: 2px 0; }
+    #process-panel .pb-row span { flex: 1; color: #9fb6c6; font-size: 11px; }
+    #process-panel .pb-row b { color: #7fe8ff; font-weight: 500; }
+    #process-panel .pb-row em { font-style: normal; color: #5c7488; font-size: 9px; }
+    #process-panel .pb-row i { position: absolute; left: 0; bottom: -1px; height: 1px; background: linear-gradient(90deg, rgba(127,232,255,0.75), rgba(127,232,255,0.05)); }
+    #process-panel .pp-note { font-size: 9px; color: #4d6577; letter-spacing: 0.5px; margin-top: 1px; }
+    body.clean #process-panel { display: none !important; }
+    @media (max-width: 900px) { #process-panel { left: 16px; top: 96px; width: 240px; } }
+
+    /* E2：导出按钮 */
+    #export-btn, #record-btn {
+      position: absolute; bottom: 118px; pointer-events: auto; cursor: pointer;
+      background: rgba(10,20,30,0.42); border: 1px solid rgba(120,190,225,0.2); color: #7f9db0;
+      padding: 5px 10px; border-radius: 3px; font-family: "PingFang SC", sans-serif;
+      font-size: 9px; letter-spacing: 1.5px; backdrop-filter: blur(8px);
+      transition: color .18s ease, border-color .18s ease;
+    }
+    #export-btn { right: 296px; }
+    #record-btn { right: 372px; }
+    #export-btn:hover, #record-btn:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+    #record-btn.on { color: #ff7a5c; border-color: rgba(255,122,92,0.6); }
+    body.clean #export-btn, body.clean #record-btn { display: none !important; }
+
+    /* E4：透视按钮 + 说明 */
+    #xray-btn {
+      position: absolute; right: 452px; bottom: 82px; pointer-events: auto; cursor: pointer;
+      background: rgba(10,20,30,0.42); border: 1px solid rgba(120,190,225,0.2); color: #7f9db0;
+      padding: 5px 10px; border-radius: 3px; font-family: "PingFang SC", sans-serif;
+      font-size: 9px; letter-spacing: 1.5px; backdrop-filter: blur(8px);
+      transition: color .18s ease, border-color .18s ease;
+    }
+    #xray-btn:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+    #xray-btn.on { color: #bfefff; border-color: rgba(191,239,255,0.6); }
+    #xray-info {
+      position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
+      display: none; padding: 7px 14px; border-radius: 3px; pointer-events: none;
+      background: rgba(8,18,28,0.78); border: 1px solid rgba(191,239,255,0.35); color: #bfefff;
+      font-family: "PingFang SC", sans-serif; font-size: 11px; letter-spacing: 0.8px;
+      backdrop-filter: blur(8px);
+    }
+    #xray-info.show { display: block; }
+    body.clean #xray-btn, body.clean #xray-info { display: none !important; }
+
+    /* E5：二维码弹层 */
+    #qr-modal {
+      position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
+      background: rgba(4,10,16,0.72); backdrop-filter: blur(6px);
+    }
+    #qr-modal.show { display: flex; }
+    #qr-modal .qr-card {
+      width: 380px; padding: 18px 20px 16px; border-radius: 5px;
+      background: linear-gradient(155deg, rgba(12,26,38,0.96), rgba(6,14,22,0.96));
+      border: 1px solid rgba(120,190,225,0.28); box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      font-family: "PingFang SC", sans-serif; color: #d7e7f2;
+    }
+    #qr-modal h3 { margin: 0 0 4px; font-size: 14px; letter-spacing: 1.4px; font-weight: 500; }
+    #qr-modal .qr-sub { font-size: 10px; color: #6d8799; letter-spacing: 0.8px; margin-bottom: 12px; }
+    #qr-canvas { display: block; width: 300px; height: 300px; margin: 0 auto 10px; border-radius: 3px; background: #fff; image-rendering: pixelated; }
+    #qr-info { font-size: 9px; color: #5c7488; text-align: center; letter-spacing: 0.5px; margin-bottom: 8px; }
+    #qr-url { display: block; font-size: 9px; color: #7f9db0; word-break: break-all; line-height: 1.5; max-height: 44px; overflow: hidden; margin-bottom: 10px; }
+    #qr-modal .qr-btns { display: flex; gap: 8px; justify-content: flex-end; }
+    #qr-modal button {
+      background: rgba(95,208,255,0.12); border: 1px solid rgba(95,208,255,0.45); color: #5fd0ff;
+      padding: 6px 14px; border-radius: 3px; cursor: pointer; font-size: 11px; letter-spacing: 1px;
+    }
+    #qr-modal button.ghost { background: transparent; border-color: rgba(120,190,225,0.25); color: #7f9db0; }
+    body.clean #qr-modal { display: none !important; }
+  </style>
+  <!-- E1：PWA -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0b141c" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
 </head>
 <body>
 <div id="loading">正在构建三维场景 …</div>
@@ -385,6 +495,14 @@
   </div>
   <div class="fnote">示意场景 · 装置布局与管廊走向为艺术化处理</div>
 </div>
+<aside id="process-panel">
+  <div class="pp-head"><span>工艺参数</span><em>示意值</em></div>
+  <div class="pp-stage">—</div>
+  <div class="pp-rows"></div>
+  <div class="pp-balance"></div>
+  <div class="pp-note">示意值 · 非生产数据</div>
+</aside>
+<div id="sw-toast"><span>有新版本</span><button id="sw-reload">刷新</button><button id="sw-close">✕</button></div>
 <div id="ui">
   <div id="title">
     <h1>石油炼化生产场景</h1>
@@ -394,9 +512,26 @@
   <div id="hint">点击设备查看参数 · 拖拽旋转 · 滚轮缩放<br/>1–9 切换机位 · 空格 播放 · ←/→ 阶段 · T 巡游</div>
   <button id="tour-btn" title="导览模式：6 段自动讲解">导览</button>
   <button id="share-btn" title="复制当前视角 / 画质 / 选中设备 / 动画进度的分享链接">分享链接</button>
+  <button id="xray-btn" title="透视：显示塔器 / 反应器内构件（X）">透视</button>
+  <button id="export-btn" title="导出当前视角为 3840×2160 PNG">导出 4K</button>
+  <button id="record-btn" title="录制 30 秒导览为 WebM">录制巡游</button>
   <button id="audio-btn" title="环境音（默认静音）：厂区低频轰鸣 + 间歇蒸汽泄放">♪ 环境音</button>
   <button id="quality-btn" title="切换画质（high / mid / low）">画质 HIGH</button>
   <div id="perf"></div>
+</div>
+<div id="xray-info"></div>
+<div id="qr-modal">
+  <div class="qr-card">
+    <h3>分享当前视角</h3>
+    <div class="qr-sub">手机扫码打开同一画面（机位 / 画质 / 选中设备 / 动画进度）</div>
+    <canvas id="qr-canvas" width="300" height="300"></canvas>
+    <div id="qr-info"></div>
+    <code id="qr-url"></code>
+    <div class="qr-btns">
+      <button id="qr-copy">复制链接</button>
+      <button id="qr-close" class="ghost">关闭</button>
+    </div>
+  </div>
 </div>
 <aside id="equip">
   <button class="eclose" id="equip-close" title="关闭">✕</button>
@@ -471,6 +606,8 @@
   </div>
 </div>
 <script>window.__t0 = performance.now();</script>
+<!-- E5：二维码生成（vendor，MIT，非 CDN） -->
+<script src="./vendor/qrcode-generator.js"></script>
 <script type="importmap">
 {
   "imports": {

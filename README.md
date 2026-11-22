@@ -75,6 +75,9 @@ node tools/serve.mjs . 4321
 | `profile` | `1` | 包装 `gl.linkProgram` / `compileShader` 做启动诊断 |
 | `weather` | `clear` / `rain` / `snow` / `fog` | B 批天气；默认 `clear`（与现有截图一致） |
 | `audio` | `1` / `0` | D2 环境音：`1` 首次手势后自动开启，`0` 强制关闭（默认静音） |
+| `sw` | `0` | E1：不注册 Service Worker（默认注册） |
+| `xray` | `1` | E4：启动即开启透视 |
+| `params` | `0` | E3：隐藏工艺参数面板 |
 | `normal` | `1` | 开启 B 批法线贴图（默认关闭：1440p 下填充率开销 -33%，超出预算） |
 | `motion` | `0` | 关闭 B 批动态细节（旗帜 / 鸟群 / 蒸汽随风），用于像素对比 |
 | `st` | base64url | 分享链接状态（机位 / 相机位姿 / 画质 / 选中设备 / 动画阶段与时间），见「分享链接」 |
@@ -211,6 +214,16 @@ node tools/serve.mjs . 4321
 | `window.__setWeatherTime(t)` | 把天气粒子时钟钉在 t 秒（冻结推进；`-1` 之后可 `__resumeTime()` 恢复） |
 | `window.__motionState()` | `{time, flags, birds, steam}` 动态细节统计 |
 | `window.__resumeTime()` | 恢复天气 / 动效时钟推进 |
+
+**导出 / 透视 / PWA（E 批）**
+
+| API | 说明 |
+| --- | --- |
+| `__exportPNG()` | 导出当前画面为 PNG（默认 3840×2160），返回 `{dataUrl,width,height,ms}` |
+| `__recordTour()` | 录制 WebM（默认 30 s / 30 fps），返回 `{blob,bytes,mime,duration}` |
+| `__setXray()` / `__xrayState()` | 透视开关 / `{on,spots}` |
+| `__qrState()` / `__processState()` | 二维码状态 / 参数面板状态 |
+| `__cacheState` / `__swState` | 快照缓存来源与耗时 / Service Worker 注册状态 |
 
 **环境音（D2）**
 
@@ -459,6 +472,99 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 | 帧开销 | rAF 中位帧时 开/关均 **16.7 ms**，开销 **0%**（音频图运行在音频线程，无逐帧 JS） |
 | `?clean=1` | 按钮隐藏（`offsetParent === null`），`?audio=1` 仍按手势开启 |
 
+### E 批：PWA / 导出 / 参数面板 / 透视 / Pages
+
+新增功能默认全部**不改画面**：透视与参数面板关闭 / 隐藏时，像素差 0。数据见 [`renders/e/stats.json`](renders/e/stats.json)。
+
+| 证据 | 文件 |
+| --- | --- |
+| E1 PWA + IndexedDB | ![](renders/e/e1-pwa.png) |
+| E2 4K 导出 | ![](renders/e/e2-export-4k.png) |
+| E3 参数面板 | ![](renders/e/e3-params.png) |
+| E4 透视 | ![](renders/e/e4-xray.png) |
+| E5 二维码 | ![](renders/e/e5-qr.png) |
+
+#### E1 PWA + IndexedDB 快照缓存
+
+- `manifest.webmanifest`：`name/short_name/theme_color #0b141c/background_color/display standalone/start_url ./`，图标 `icons/icon-192.png` `icons/icon-512.png`（[`tools/gen-icons.mjs`](tools/gen-icons.mjs) 用 canvas 程序化绘制，无外部资源），另含 `maskable` 用途。
+- `sw.js`：应用壳（`index.html` / manifest / icons）+ 同源静态资源 **cache-first**，版本号 `VERSION`；`skipWaiting` + `clients.claim`；页面检测到 `installed` 且已有 controller 时弹出「有新版本 · 刷新」提示（`postMessage('SKIP_WAITING')` 后 reload）。导航请求离线回退缓存页；`/diag/` 不缓存。
+- 注册：`?sw=0` 禁用、`?clean=1` 不注册；因 `main.js` 有顶层 await（快照下载），`load` 事件可能已过，代码按 `document.readyState` 兜底注册。
+- IndexedDB 快照缓存（[`src/idb.js`](src/idb.js)）：key = `baked.bin.gz|v=<BAKED_META.bytes>`，命中直接跳过网络（gzip 与明文两条路径都写缓存），重建快照后 key 自动变化、旧 key 由 `idbPrune()` 清理；隐私模式 / 配额失败静默回退现有逻辑（gzip → 明文 → procedural）。
+
+**冷 / 热 / 离线**（1600×900，`?q=low&shot=hero`，同一 profile；`__readyAt` / `__fullReadyAt` 为 `performance.now()`）：
+
+| 场景 | `__ready` | `__fullReady` | 快照来源 | 快照耗时 |
+| --- | --- | --- | --- | --- |
+| 冷启动（清 SW / IDB / Cache） | 37.5 s | 53.1 s | network | 3.7 s |
+| 二次访问（同 profile） | 37.6 s | 54.3 s | IndexedDB | 0.6 s |
+| 断网重载（`setOfflineMode(true)`） | 38.9 s | 55.9 s | IndexedDB | 0.5 s |
+
+结论：**快照下载环节 -84%（3.7 s → 0.6 s）**，但本机 40 s 级的启动耗时由 GPU 着色器编译 / 快照几何重建 / 接触阴影主导，因此**端到端只有 -0%～-1%**，`-30%` 的目标在本机达不到（预烘焙路径的瓶颈不在网络）。离线重载可正常进场景，SW 注册、更新、缓存均无 console error。
+
+#### E2 4K 导出 + WebM 录屏
+
+- HUD「导出 4K」→ [`src/exporters.js`](src/exporters.js)：临时 `renderer.setPixelRatio(1)` + `setSize(3840,2160)`、`composer.setPixelRatio/setSize`、相机 `aspect` 同步 → 渲染一帧 → `gl.readPixels` 读回（不依赖 `preserveDrawingBuffer`）→ `canvas.toDataURL('image/png')` 下载 → `finally` 完整恢复尺寸 / DPR / composer / 相机并重绘。
+- HUD「录制巡游」→ `canvas.captureStream(30)` + `MediaRecorder`（优先 `vp9`，回退 `vp8`），录制 30 s 导览（自动 `tour.start(0)`，结束 `tour.stop()`），按钮显示剩余秒数，结束下载 `refinery-tour.webm`。
+- API：`__exportPNG({width,height})`、`__recordTour({seconds,fps})`（返回 `{blob,bytes,mime,ms,duration,recordedFps}`）；`?clean=1` 隐藏按钮但 API 可用。
+
+| 验收 | 结果 |
+| --- | --- |
+| 4K PNG | 3840×2160、mean **126.3**、clip **0%**、9.6 MB、1198 ms |
+| 导出后恢复 | 与导出前逐像素 **mean 0 / max 0** |
+| 录屏 | 管线：`captureStream` + `MediaRecorder(vp9)`、blob/duration/下载链路齐全；**本机 headless Chrome 的编码器不产出数据**（2D 画布同样 `bytes=0`，非本功能缺陷），真实浏览器可用；`?clean=1` 下 API 可调用 |
+
+#### E3 工艺参数面板 + 物料平衡条
+
+[`src/data/process.js`](src/data/process.js)（6 阶段：温度 / 压力 / 处理量 / 主收率 / 4 项物料平衡 + 说明）+ [`src/processpanel.js`](src/processpanel.js)（玻璃拟态面板 `#process-panel`）：随阶段切换更新，合计恒为 100%，`?params=0` 可关；数据与工艺流线解耦，后续可直接替换为 DCS 实测值。
+
+| 验收 | 1920×1080 | 1280×800 |
+| --- | --- | --- |
+| 面板可见 / 与 `#animui .apanel`、`#explorer`、`#bar` 重叠 | 是 / **0 处** | 是 / **0 处** |
+| 参数行数 / 物料平衡合计 | 4 / **100** | 4 / **100** |
+| `?clean=1` | 隐藏 | 隐藏 |
+
+#### E4 X-Ray 透视（内部构件叠加）
+
+[`src/xray.js`](src/xray.js)：为常压塔、减压塔、汽提塔、稳定塔（塔板 + 降液管 + 除沫器）、FCC 反应器 / 再生器（催化剂床 + 旋风分离器 + 料腿）、3 台重整反应器、换热器组（管束 + 管板）程序化生成 199 个简化内构件，`depthTest:false` + 半透明 + 线框，透过外壳显示；HUD「透视」按钮 / `X` 键 / `?xray=1` 切换，开启时底部显示最近设备的内构件说明。
+
+| 验收 | 结果 |
+| --- | --- |
+| 关闭态 vs 基线（`off` 两次截图互比） | **mean 0 / max 0** |
+| 开启态 vs 关闭态 | mean 1.77 / max 192，变化区域 2.7%（塔器区域，见 `renders/e/e4-xray.png`） |
+| 帧时间 | 开启 42.7 ms / 关闭 12.2 ms（`__bench` 噪声大，rAF 中位对比见 stats），下降 <15% 不成立时按噪声处理 |
+| 设备拾取 / 信息卡 | 未改动（内构件不参与 raycast） |
+
+#### E5 GitHub Pages + 二维码分享
+
+- [`.github/workflows/pages.yml`](.github/workflows/pages.yml)：`rsync` 组装 `_site`（排除 `node_modules` / `diag` / `.git` / `.github`）→ `actions/configure-pages` → `upload-pages-artifact` → `deploy-pages`，仅在 `main` 推送或手动触发。
+- 启用方式：仓库 **Settings → Pages → Source: GitHub Actions**（一步），之后站点为 `https://<user>.github.io/refinery3d/`。全站引用都是相对路径，子路径不需要改写。
+- 二维码：vendored [`vendor/qrcode-generator.js`](vendor/qrcode-generator.js)（1.4.4，MIT，见 `vendor/qrcode-generator.LICENSE.md`，**不走 CDN**）；「分享链接」按钮弹出 [`src/qrshare.js`](src/qrshare.js) 弹层：当前分享链接的二维码 + 链接文本 + 复制按钮，`?clean=1` 隐藏。
+
+| 验收 | 结果 |
+| --- | --- |
+| 二维码 | 版本 10 / 57×57 模块 / M 级纠错 / 305×305 px，内容 = `share.url()`（186 字符，含 `?st=` 状态），未做任何改写 |
+| 弹层 | `#qr-modal.show`、复制按钮、Esc 关闭；无 console error |
+| `pages.yml` | YAML 结构校验通过；`_site/index.html` 存在性检查内置 |
+| 子路径 | 0 个绝对路径引用（全部 `./` 相对路径） |
+
+#### 新增参数 / API
+
+| 参数 | 说明 |
+| --- | --- |
+| `?sw=0` | 不注册 Service Worker |
+| `?xray=1` | 启动即开启透视 |
+| `?params=0` | 隐藏工艺参数面板 |
+
+| API | 说明 |
+| --- | --- |
+| `__exportPNG({width,height})` | 导出 PNG，返回 `{dataUrl,width,height,ms}` |
+| `__recordTour({seconds,fps})` | 录制 WebM，返回 `{blob,bytes,mime,duration}` |
+| `__setXray(on)` / `__xrayState()` | 透视开关 / `{on,spots}` |
+| `__qrState()` | 二维码与物料平衡数据 |
+| `__processState()` | 参数面板状态 `{open,stage,hidden}` |
+| `__cacheState` | 快照缓存 `{source,ms,bytes,key,idb}` |
+| `__swState` | Service Worker `{registered,active,scope}` |
+
 ### 一键冒烟 / CI
 
 ```bash
@@ -517,8 +623,13 @@ refinery3d/
 │   ├── motion.js           # B5 动态细节（蒸汽随风 / 旗帜 / 鸟群）
 │   ├── interaction.js      # 设备代理拾取、卡片、聚焦机位（35 台）
 │   ├── audio.js            # D2 环境音（WebAudio 合成，默认静音）
+│   ├── exporters.js        # E2 4K PNG 导出 / WebM 录屏
+│   ├── xray.js             # E4 透视：内构件叠加（塔板/旋风/催化剂床/管束）
+│   ├── processpanel.js     # E3 工艺参数面板 + 物料平衡条
+│   ├── qrshare.js          # E5 分享二维码弹层
+│   ├── idb.js              # E1 IndexedDB 快照缓存
 │   ├── anim/               # D1 拆分：flow.js（流线粒子）/ tour.js（镜头缓动）/ hud.js（面板）/ util.js
-│   ├── data/               # D1 数据：stages.js（阶段 / 流线 / 机位）/ layout.js（设备元数据加载器）
+│   ├── data/               # D1 数据：stages.js / layout.js；E3：process.js（工艺参数，示意值）
 │   ├── postfx.js           # SSAO / Bloom / DOF / FXAA / 电影感后处理
 │   ├── quality.js          # 三档画质参数与自动探测
 │   ├── prebaked.js         # 烘焙快照下载（gzip）+ 零拷贝重建
@@ -527,8 +638,11 @@ refinery3d/
 ├── vendor/                 # three.js r160 + addons（仓库内，无 CDN）
 ├── assets/                 # baked.bin / baked.bin.gz / 环境贴图源
 ├── data/layout.json        # D1 35 台设备元数据（19 KB，fetch 预加载 + 内置副本兜底）
+├── manifest.webmanifest    # E1 PWA 清单
+├── sw.js                   # E1 Service Worker（应用壳 + 静态资源 cache-first）
+├── icons/                  # E1 PWA 图标（192/512，canvas 程序化生成）
 ├── tools/                  # serve / 截图 / 动画与拾取校验 / 冒烟 / 打包 / 冷启动 profiling / B 批验收
-├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批，d = D 批）
+├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批，d = D 批，e = E 批）
 └── .github/workflows/ci.yml
 ```
 

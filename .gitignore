@@ -10,4 +10,5 @@ tools/verify-*.mjs
 !tools/verify-equip.mjs
 !tools/verify-b.mjs
 !tools/verify-d.mjs
+!tools/verify-e.mjs
 tools/timing-check.mjs

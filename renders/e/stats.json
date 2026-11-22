@@ -1,0 +1,187 @@
+{
+  "generatedAt": "2026-11-22T08:02:03.121Z",
+  "branch": "opt/e-batch",
+  "baseline": "main @ 039130c",
+  "note": "E1 为同一 Chrome profile 的三次启动（1600×900，?q=low&shot=hero）；E2/E4 像素对比在 clean + anim 冻结（stage/t/playing=0）+ autoexposure=0 + motion=0 下拍摄。",
+  "e1": {
+    "cold": {
+      "ready": 35971.89999999106,
+      "full": 50650.79999999702,
+      "cache": {
+        "source": "network",
+        "ms": 575.3,
+        "bytes": 23385776,
+        "key": "baked.bin.gz|v=23385776",
+        "idb": true
+      },
+      "sw": {
+        "registered": true,
+        "active": false,
+        "scope": "http://127.0.0.1:4321/"
+      }
+    },
+    "warm": {
+      "ready": 36729.29999999702,
+      "full": 50801,
+      "cache": {
+        "source": "idb",
+        "ms": 2469.5,
+        "bytes": 23385776,
+        "key": "baked.bin.gz|v=23385776",
+        "idb": true
+      },
+      "sw": {
+        "registered": true,
+        "active": true,
+        "scope": "http://127.0.0.1:4321/"
+      }
+    },
+    "offline": {
+      "ok": true,
+      "ready": 14474.59999999404,
+      "full": 18475,
+      "cache": {
+        "source": "idb",
+        "ms": 175.6,
+        "bytes": 23385776,
+        "key": "baked.bin.gz|v=23385776",
+        "idb": true
+      },
+      "sw": {
+        "registered": true,
+        "active": true,
+        "scope": "http://127.0.0.1:4321/"
+      }
+    },
+    "fetchMs": {
+      "cold": 575.3,
+      "warm": 2469.5,
+      "offline": 175.6
+    },
+    "warmVsColdReadyPct": 2.1,
+    "warmVsColdFullPct": 0.3,
+    "offlineVsColdReadyPct": -59.8,
+    "fetchDeltaPct": 329.3
+  },
+  "e2": {
+    "png": {
+      "w": 3840,
+      "h": 2160,
+      "mean": 126.3,
+      "clipPct": 0,
+      "bytes": 9628295,
+      "ms": 1198
+    },
+    "restore": {
+      "mean": 0,
+      "max": 0
+    },
+    "record": {
+      "bytes": 0,
+      "mime": "video/webm;codecs=vp9",
+      "duration": null,
+      "note": "headless Chrome 编码器不产出数据（2D 画布同样为 0），API 链路完整"
+    }
+  },
+  "e3": {
+    "layout": {
+      "1920x1080": {
+        "panel": {
+          "x": 42,
+          "y": 150,
+          "w": 286,
+          "h": 333
+        },
+        "overlaps": [],
+        "rows": 4,
+        "balanceSum": 100,
+        "visible": true
+      },
+      "1280x800": {
+        "panel": {
+          "x": 42,
+          "y": 150,
+          "w": 286,
+          "h": 333
+        },
+        "overlaps": [],
+        "rows": 4,
+        "balanceSum": 100,
+        "visible": true
+      }
+    },
+    "balanceAll100": true,
+    "errors": []
+  },
+  "e4": {
+    "offVsOff": {
+      "mean": 0,
+      "max": 0
+    },
+    "onVsOff": {
+      "mean": 1.773,
+      "max": 192
+    },
+    "changedPct": 2.716,
+    "changedBbox": [
+      651,
+      132,
+      1264,
+      899
+    ],
+    "spots": 10,
+    "internals": 199
+  },
+  "e5": {
+    "qr": {
+      "enabled": true,
+      "open": true,
+      "modules": 57,
+      "version": 10,
+      "ecc": "M",
+      "chars": 186,
+      "canvas": {
+        "w": 305,
+        "h": 305
+      },
+      "modalShown": true
+    },
+    "yaml": "pages.yml 结构校验通过",
+    "absoluteRefs": 0
+  },
+  "lines": {
+    "src/main.js": 1642,
+    "src/prebaked.js": 131,
+    "src/idb.js": 106,
+    "src/exporters.js": 136,
+    "src/xray.js": 147,
+    "src/processpanel.js": 59,
+    "src/qrshare.js": 62,
+    "src/data/process.js": 104,
+    "sw.js": 59,
+    "manifest.webmanifest": 19,
+    "vendor/qrcode-generator.js": 2298
+  },
+  "checkAll": {
+    "pass": true,
+    "totalSec": 374.5,
+    "steps": [
+      [
+        "shots",
+        93.4
+      ],
+      [
+        "anim",
+        99.6
+      ],
+      [
+        "equip",
+        90.4
+      ],
+      [
+        "opt2",
+        91.1
+      ]
+    ]
+  }
+}
