@@ -36,11 +36,22 @@ jobs:
           curl -sf -o /dev/null http://127.0.0.1:4321/ || (cat /tmp/serve.log && exit 1)
 
       - name: Anim / geometry checks
+        id: anim
+        continue-on-error: true
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
           SERVE_URL: http://127.0.0.1:4321/
         timeout-minutes: 12
-        run: node tools/anim.mjs check
+        shell: bash
+        run: |
+          set -o pipefail
+          node tools/anim.mjs check 2>&1 | tee /tmp/anim.log
+
+      - name: Annotate anim failure
+        if: steps.anim.outcome == 'failure'
+        run: |
+          tail -c 4000 /tmp/anim.log | while IFS= read -r line; do echo "::error::${line}"; done
+          exit 1
 
       - name: Screenshot smoke (1 shot)
         env:
