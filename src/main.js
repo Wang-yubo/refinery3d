@@ -528,7 +528,7 @@ const SHOTS = {
 };
 
 function syncBar(name) {
-  document.querySelectorAll('#bar button').forEach((b) => b.classList.toggle('active', b.dataset.shot === name));
+  document.querySelectorAll('#shot-grid button, #bar button').forEach((b) => b.classList.toggle('active', b.dataset.shot === name));
 }
 
 /** 应用光照预设（机位与 HUD 各自负责，方便动画模式复用） */
@@ -649,21 +649,21 @@ function setShot(name) {
 /* HUD                                                                 */
 /* ------------------------------------------------------------------ */
 if (!isClean) {
-  const bar = document.getElementById('bar');
+  const grid = document.getElementById('shot-grid') || document.getElementById('bar');
   Object.entries(SHOTS).forEach(([key, s], i) => {
     const b = document.createElement('button');
     b.textContent = `${i + 1} · ${s.label}`;
     b.dataset.shot = key;
-    b.onclick = () => setShot(key);
-    bar.appendChild(b);
+    b.onclick = () => { setShot(key); setTools(false); };
+    grid.appendChild(b);
   });
   // 进入工艺流程动画的专用按钮（不计入原有 9 个机位）
   const ab = document.createElement('button');
   ab.textContent = '▶ 工艺流程动画';
   ab.dataset.shot = 'process';
   ab.className = 'animshot';
-  ab.onclick = () => setShot('process');
-  bar.appendChild(ab);
+  ab.onclick = () => { setShot('process'); setTools(false); };
+  grid.appendChild(ab);
 
   addEventListener('keydown', (e) => {
     const keys = Object.keys(SHOTS);
@@ -673,6 +673,25 @@ if (!isClean) {
 }
 
 mark('lights-done');
+
+/* 机位 / 工具菜单：默认收起，只留右上角一个按钮 */
+const toolsToggle = document.getElementById('tools-toggle');
+const actionsEl = document.getElementById('actions');
+function setTools(open) {
+  if (!actionsEl) return;
+  const on = !!open;
+  actionsEl.classList.toggle('open', on);
+  toolsToggle?.setAttribute('aria-expanded', String(on));
+}
+window.__toolsState = () => ({ open: !!actionsEl?.classList.contains('open') });
+toolsToggle?.addEventListener('click', (e) => { e.stopPropagation(); setTools(!actionsEl.classList.contains('open')); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') setTools(false); });
+document.addEventListener('pointerdown', (e) => {
+  if (!actionsEl?.classList.contains('open')) return;
+  if (actionsEl.contains(e.target) || toolsToggle?.contains(e.target)) return;
+  setTools(false);
+});
+
 /* ------------------------------------------------------------------ */
 /* bake static geometry, then render                                   */
 /* ------------------------------------------------------------------ */
@@ -700,6 +719,7 @@ const anim = createAnimation({
 mark('anim-done');
 anim.onModeChange = (on) => {
   if (on) {
+    setTools(false);
     syncBar('process');
   } else if (!isClean) {
     syncBar(currentShot);
@@ -774,6 +794,7 @@ function render() {
 
 function animate() {
   requestAnimationFrame(animate);
+  processPanel.setOpen(params.get('params') === '0' ? false : (params.get('params') === '1' || anim.isActive()));
   processPanel.update();
   if (xray.root.visible) {
     const now2 = performance.now();
@@ -1387,7 +1408,6 @@ function applyResponsiveUi() {
   const ex = document.getElementById('explorer');
   if (narrowUi()) {
     ex?.classList.add('closed');
-    processPanel.setOpen(false);
   }
 }
 applyResponsiveUi();
