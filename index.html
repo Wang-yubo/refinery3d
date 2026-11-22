@@ -277,7 +277,10 @@
     #minimap-wrap { right: 16px; bottom: 104px; width: 168px; }
     #minimap { width: 168px; height: 112px; }
   }
-  @media (max-width: 620px) { #minimap-wrap { display: none; } }
+  @media (max-width: 620px) {
+    #title { max-width: calc(100vw - 32px); }
+    #title h1 { font-size: 19px; letter-spacing: 2px; }
+    #title p { font-size: 10px; letter-spacing: 1.4px; } #minimap-wrap { display: none; } }
 
   /* ---------- C2 分享按钮 ---------- */
   #share-btn {
@@ -360,6 +363,157 @@
   /* 导览时流程动画 HUD 一定不在（互斥），这里再兜一层 */
   body.tour #animui, body.tour #flowui { display: none !important; }
 
+
+  /* ================================================================
+     fix/ui-layout：浮层统一走「左列 / 右列 / 底部」三段式栅格
+     - 左列：参数面板 → 设备卡（flex column, gap 8）
+     - 右列：按钮群 → 设备清单 → 小地图
+     - 底部：#bar 独占，列区底部留 96px（≥ 条高 + 24）
+     - z-index：modal 80 > 卡片/面板 30-32 > 按钮 31 > 字幕 26 > 场景 0
+     ================================================================ */
+  :root { --gutter: 42px; --rail-gap: 8px; --bar-h: 36px; }
+  #left-rail, #right-rail {
+    position: fixed; display: flex; flex-direction: column; gap: var(--rail-gap);
+    pointer-events: none; top: 146px; bottom: 96px;
+  }
+  #left-rail { left: var(--gutter); width: 338px; z-index: 30; align-items: stretch; }
+  #right-rail { right: var(--gutter); width: 306px; top: 36px; z-index: 31; align-items: flex-end; }
+  #left-rail > *, #right-rail > * {
+    position: static !important; inset: auto !important; transform: none !important;
+    margin: 0 !important; pointer-events: auto; box-sizing: border-box;
+  }
+  #left-rail > aside { width: 100%; flex: 0 1 auto; min-height: 0; }
+  #process-panel { display: none; max-height: min(46vh, 430px); overflow-y: auto; }
+  #process-panel.open { display: flex; }
+  #equip { display: none; width: 100%; max-height: 100%; overflow-y: auto; }
+  #equip.open { display: block; }
+  /* 左列里 xray 说明变成普通 chip */
+  #xray-info {
+    display: none; width: 100%; left: auto; bottom: auto; transform: none;
+    padding: 7px 12px; font-size: 11px; line-height: 1.5; white-space: normal;
+  }
+  #xray-info.show { display: block; }
+
+  /* 按钮群：右上角整体右对齐，可换行 */
+  #actions { display: flex; flex-wrap: wrap; gap: var(--rail-gap); justify-content: flex-end; width: 100%; }
+  #actions > * { position: static !important; inset: auto !important; float: none !important; }
+  #actions button {
+    min-width: 36px; min-height: 36px; padding: 8px 12px; font-size: 10px; letter-spacing: 1.2px;
+    border-radius: 3px; cursor: pointer; pointer-events: auto;
+    background: rgba(10,20,30,0.5); border: 1px solid rgba(120,190,225,0.22); color: #93b3c6;
+    font-family: "PingFang SC", sans-serif; backdrop-filter: blur(8px);
+    transition: color .18s ease, border-color .18s ease, background .18s ease;
+  }
+  #actions button:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); background: rgba(14,30,44,0.72); }
+  #actions button.on { color: #5fd0ff; border-color: rgba(95,208,255,0.6); }
+  #actions #quality-btn { min-width: 86px; }
+  #actions #record-btn.on { color: #ff7a5c; border-color: rgba(255,122,92,0.6); }
+
+  /* 右列：清单 → 小地图 */
+  #explorer { width: 100%; max-height: min(52vh, 520px); flex: 0 1 auto; min-height: 0; }
+  #explorer.closed { width: 148px; align-self: flex-end; }
+  #minimap-wrap { flex: none; width: 224px; align-self: flex-end; margin-top: auto; }
+  #minimap-wrap #minimap { width: 100%; height: auto; }
+
+  /* 底部条与提示 */
+  #bar { max-width: calc(100vw - 460px); z-index: 26; }
+  #bar button { min-height: 36px; }
+  #hint { max-width: 236px; bottom: 40px; z-index: 25; }
+  body.tour #tourui .tpanel { z-index: 27; }
+
+  /* 各模式：列区自动让位 */
+  body.anim #right-rail, body.flow #right-rail { bottom: auto; }
+  body.anim #animui .apanel {
+    top: 96px; transform: none; max-height: calc(100vh - 200px); overflow-y: auto; z-index: 28;
+  }
+  body.flow #left-rail { bottom: calc(var(--bar-h, 36px) + 152px); }
+  body.flow #bar { max-width: calc(100vw - 120px); }
+
+  @media (max-width: 1300px) { #hint { display: none; } }
+
+  /* ---------- 窄屏（≤900px）：抽屉化 ---------- */
+  @media (max-width: 900px) {
+    :root { --gutter: 16px; }
+    #left-rail {
+      left: 16px; right: 16px; width: auto; top: auto; bottom: calc(var(--bar-h, 120px) + 24px);
+      max-height: 46vh; z-index: 32;
+    }
+    #right-rail { right: 16px; top: 96px; bottom: auto; width: min(300px, calc(100vw - 32px)); }
+    #actions button { min-width: 44px; min-height: 44px; }
+    #bar { left: 16px; max-width: calc(100vw - 32px); bottom: 16px; }
+    #bar button { min-height: 44px; }
+    #explorer { max-height: 38vh; }
+    #minimap-wrap { display: none; }
+    /* 左列卡片打开时，右列清单让位（有意隐藏，审计里单列） */
+    body:has(#equip.open) #explorer,
+    body:has(#process-panel.open) #explorer { display: none !important; }
+    #process-panel { max-height: none; }
+    #equip { max-height: none; }
+  }
+  @media (max-width: 620px) {
+    #bar { gap: 6px; }
+    #bar button { padding: 7px 11px; font-size: 11px; }
+  }
+
+  /* ---------- 控件触达尺寸 & 剩余重叠微调 ---------- */
+  #explorer #xp-toggle { width: 36px; height: 36px; min-width: 36px; flex: none; font-size: 12px; }
+  #explorer.closed { width: 176px; }
+  #explorer .xp-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #explorer .xp-ghead { min-height: 36px; }
+  #equip .eclose { width: 36px; height: 36px; font-size: 14px; right: 4px; top: 4px; }
+  #equip .ebtns button { min-height: 36px; }
+  #animui .abtns button { min-height: 36px; min-width: 36px; }
+  body.tour #tourui .tbtn, body.tour #tourui .tpanel button { min-width: 36px; min-height: 36px; }
+  /* 字幕/导览面板与底部条互斥：面板始终抬到阶段条之上 8px */
+  body.tour #tourui .tpanel { bottom: calc(var(--bar-h, 36px) + 24px); }
+  body.flow #flowui .fnote { bottom: calc(var(--bar-h, 36px) + 40px); }
+  @media (max-width: 900px) {
+    body.flow #flowui .fchain {
+      left: 16px; right: 16px; transform: none; flex-wrap: wrap; gap: 8px 10px;
+      max-width: calc(100vw - 32px); padding: 10px 12px;
+    }
+    body.flow #flowui .fstep { min-width: 44%; }
+    body.flow #flowui .farrow { display: none; }
+    body.flow #flowui .ftitle { left: 16px; top: 40px; }
+    body.flow #flowui .ftitle h2 { font-size: 20px; letter-spacing: 2px; }
+  }
+
+  /* ---------- 窄屏：触屏 44px + flow 流程条单行横向滚动 ---------- */
+  @media (max-width: 900px) {
+    #explorer #xp-toggle, #explorer .xp-ghead, #explorer .xp-row,
+    #equip .eclose, #equip .ebtns button, #animui .abtns button,
+    body.tour #tourui .tbtn, body.tour #tourui .tpanel button { min-width: 44px; min-height: 44px; }
+    body.flow #flowui .fchain {
+      flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start;
+      bottom: calc(var(--bar-h, 120px) + 16px); padding: 8px 10px;
+    }
+    body.flow #flowui .fstep { min-width: 88px; }
+    body.flow #flowui .farrow { display: block; }
+    body.flow #flowui .fnote { display: none; }
+  }
+
+  /* ---------- 字幕 / 流程条与阶段条的硬间距（≥8px） ---------- */
+  body.tour #tourui .tpanel { bottom: calc(var(--bar-h, 36px) + 48px); }
+  body.flow #flowui .fnote { bottom: calc(var(--bar-h, 36px) + 52px); }
+  @media (max-width: 900px) {
+    body.flow #flowui .fchain { bottom: calc(var(--bar-h, 120px) + 36px); }
+    #animui .abtns .ap { min-width: 44px; }
+  }
+
+  /* ---------- 统一定义「阶段条占位」：bottom 偏移 + 高度，浮层一律排在它上面 8px ---------- */
+  :root { --bar-bottom: 34px; }
+  #bar { --bar-bottom: 34px; }
+  body.flow { --bar-bottom: 126px; }
+  @media (max-width: 900px) { :root { --bar-bottom: 16px; } }
+  body.tour #tourui .tpanel { bottom: calc(var(--bar-bottom) + var(--bar-h, 36px) + 10px); }
+  body.flow #flowui .fnote { bottom: calc(var(--bar-bottom) + var(--bar-h, 36px) + 10px); }
+  @media (max-width: 900px) {
+    body.flow #flowui .fchain { bottom: calc(var(--bar-bottom) + var(--bar-h, 96px) + 10px); }
+    #left-rail { bottom: calc(var(--bar-bottom) + var(--bar-h, 96px) + 24px); }
+  }
+
+  /* clean 截图模式：两列栅格同样整体隐藏，保证 3D 画面逐像素可对比 */
+  body.clean #left-rail, body.clean #right-rail { display: none !important; }
 </style>
   <style>
     /* E1：SW 新版本提示 */
@@ -495,13 +649,7 @@
   </div>
   <div class="fnote">示意场景 · 装置布局与管廊走向为艺术化处理</div>
 </div>
-<aside id="process-panel">
-  <div class="pp-head"><span>工艺参数</span><em>示意值</em></div>
-  <div class="pp-stage">—</div>
-  <div class="pp-rows"></div>
-  <div class="pp-balance"></div>
-  <div class="pp-note">示意值 · 非生产数据</div>
-</aside>
+
 <div id="sw-toast"><span>有新版本</span><button id="sw-reload">刷新</button><button id="sw-close">✕</button></div>
 <div id="ui">
   <div id="title">
@@ -510,16 +658,8 @@
   </div>
   <div id="bar"></div>
   <div id="hint">点击设备查看参数 · 拖拽旋转 · 滚轮缩放<br/>1–9 切换机位 · 空格 播放 · ←/→ 阶段 · T 巡游</div>
-  <button id="tour-btn" title="导览模式：6 段自动讲解">导览</button>
-  <button id="share-btn" title="复制当前视角 / 画质 / 选中设备 / 动画进度的分享链接">分享链接</button>
-  <button id="xray-btn" title="透视：显示塔器 / 反应器内构件（X）">透视</button>
-  <button id="export-btn" title="导出当前视角为 3840×2160 PNG">导出 4K</button>
-  <button id="record-btn" title="录制 30 秒导览为 WebM">录制巡游</button>
-  <button id="audio-btn" title="环境音（默认静音）：厂区低频轰鸣 + 间歇蒸汽泄放">♪ 环境音</button>
-  <button id="quality-btn" title="切换画质（high / mid / low）">画质 HIGH</button>
   <div id="perf"></div>
 </div>
-<div id="xray-info"></div>
 <div id="qr-modal">
   <div class="qr-card">
     <h3>分享当前视角</h3>
@@ -533,31 +673,10 @@
     </div>
   </div>
 </div>
-<aside id="equip">
-  <button class="eclose" id="equip-close" title="关闭">✕</button>
-  <div class="ecat" id="equip-cat"></div>
-  <h3 id="equip-cn"></h3>
-  <p class="een" id="equip-en"></p>
-  <p class="edesc" id="equip-desc"></p>
-  <dl class="especs" id="equip-specs"></dl>
-  <div class="ebtns">
-    <button id="equip-focus">⌖ 机位聚焦</button>
-    <button id="equip-close2">关闭</button>
-  </div>
-</aside>
+
 <div id="picktip"><b id="picktip-cn"></b><span id="picktip-en"></span></div>
-<aside id="explorer">
-  <div class="xp-head">
-    <span class="xp-title">设备清单<em>EQUIPMENT</em><b id="xp-count">35</b></span>
-    <button id="xp-toggle" title="折叠 / 展开">▾</button>
-  </div>
-  <div class="xp-body">
-    <input id="xp-search" type="search" autocomplete="off" spellcheck="false"
-           placeholder="搜索：常压塔 / T-101 / column" />
-    <div id="xp-list"></div>
-  </div>
-</aside>
-<div id="minimap-wrap"><canvas id="minimap" width="224" height="150"></canvas><span class="mm-cap">厂区俯视 · MINIMAP</span></div>
+
+
 <div id="share-toast"></div>
 <div id="tourui">
   <div class="tpanel">
@@ -605,6 +724,53 @@
     <div class="akeys">空格 播放/暂停 · ←/→ 切换阶段 · T 自动巡游</div>
   </div>
 </div>
+
+<div id="left-rail" aria-label="左侧信息列">
+  <div id="xray-info"></div>
+  <aside id="process-panel">
+  <div class="pp-head"><span>工艺参数</span><em>示意值</em></div>
+  <div class="pp-stage">—</div>
+  <div class="pp-rows"></div>
+  <div class="pp-balance"></div>
+  <div class="pp-note">示意值 · 非生产数据</div>
+</aside>
+  <aside id="equip">
+  <button class="eclose" id="equip-close" title="关闭">✕</button>
+  <div class="ecat" id="equip-cat"></div>
+  <h3 id="equip-cn"></h3>
+  <p class="een" id="equip-en"></p>
+  <p class="edesc" id="equip-desc"></p>
+  <dl class="especs" id="equip-specs"></dl>
+  <div class="ebtns">
+    <button id="equip-focus">⌖ 机位聚焦</button>
+    <button id="equip-close2">关闭</button>
+  </div>
+</aside>
+</div>
+<div id="right-rail" aria-label="右侧信息列">
+  <div id="actions" role="toolbar" aria-label="工具栏">
+    <button id="quality-btn" title="切换画质（high / mid / low）">画质 HIGH</button>
+    <button id="audio-btn" title="环境音（默认静音）：厂区低频轰鸣 + 间歇蒸汽泄放">♪ 环境音</button>
+    <button id="xray-btn" title="透视：显示塔器 / 反应器内构件（X）">透视</button>
+    <button id="export-btn" title="导出当前视角为 3840×2160 PNG">导出 4K</button>
+    <button id="record-btn" title="录制 30 秒导览为 WebM">录制巡游</button>
+    <button id="share-btn" title="复制当前视角 / 画质 / 选中设备 / 动画进度的分享链接">分享链接</button>
+    <button id="tour-btn" title="导览模式：6 段自动讲解">导览</button>
+  </div>
+  <aside id="explorer">
+  <div class="xp-head">
+    <span class="xp-title">设备清单<em>EQUIPMENT</em><b id="xp-count">35</b></span>
+    <button id="xp-toggle" title="折叠 / 展开">▾</button>
+  </div>
+  <div class="xp-body">
+    <input id="xp-search" type="search" autocomplete="off" spellcheck="false"
+           placeholder="搜索：常压塔 / T-101 / column" />
+    <div id="xp-list"></div>
+  </div>
+</aside>
+  <div id="minimap-wrap"><canvas id="minimap" width="224" height="150"></canvas><span class="mm-cap">厂区俯视 · MINIMAP</span></div>
+</div>
+
 <script>window.__t0 = performance.now();</script>
 <!-- E5：二维码生成（vendor，MIT，非 CDN） -->
 <script src="./vendor/qrcode-generator.js"></script>

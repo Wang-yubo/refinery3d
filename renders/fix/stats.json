@@ -1,0 +1,185 @@
+{
+  "generatedAt": "2026-11-22T09:54:15.474Z",
+  "branch": "fix/ui-layout",
+  "baseline": "opt/e-batch @ 84654f2",
+  "audit": {
+    "before": {
+      "pairs": 176,
+      "maxOverlap": 76898,
+      "overflow": 10,
+      "minButton": 20,
+      "combos": 63,
+      "failed": 63
+    },
+    "after": {
+      "pairs": 0,
+      "maxOverlap": 0,
+      "overflow": 0,
+      "minButton": 36,
+      "combos": 63,
+      "failed": 0
+    },
+    "combos": 63
+  },
+  "perViewport": {
+    "before": {
+      "1920x1080": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 20
+      },
+      "1440x900": {
+        "combos": 9,
+        "overlapPairs": 13,
+        "maxOverlap": 11840,
+        "overflow": 0,
+        "minButton": 20
+      },
+      "1280x720": {
+        "combos": 9,
+        "overlapPairs": 24,
+        "maxOverlap": 21816,
+        "overflow": 0,
+        "minButton": 20
+      },
+      "1024x768": {
+        "combos": 9,
+        "overlapPairs": 24,
+        "maxOverlap": 22632,
+        "overflow": 0,
+        "minButton": 20
+      },
+      "900x700": {
+        "combos": 9,
+        "overlapPairs": 41,
+        "maxOverlap": 16577,
+        "overflow": 0,
+        "minButton": 20
+      },
+      "820x1180": {
+        "combos": 9,
+        "overlapPairs": 31,
+        "maxOverlap": 17343,
+        "overflow": 0,
+        "minButton": 20
+      },
+      "390x844": {
+        "combos": 9,
+        "overlapPairs": 43,
+        "maxOverlap": 76898,
+        "overflow": 10,
+        "minButton": 20
+      }
+    },
+    "after": {
+      "1920x1080": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 36
+      },
+      "1440x900": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 36
+      },
+      "1280x720": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 36
+      },
+      "1024x768": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 36
+      },
+      "900x700": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 44
+      },
+      "820x1180": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 44
+      },
+      "390x844": {
+        "combos": 9,
+        "overlapPairs": 0,
+        "maxOverlap": 0,
+        "overflow": 0,
+        "minButton": 44
+      }
+    }
+  },
+  "pixel": {
+    "note": "clean=1 + autoexposure=0 + motion=0 的静态帧，跨会话对比（同会话重复性 0/0）",
+    "staticClean": {
+      "mean": 0,
+      "max": 0
+    },
+    "animPhase": {
+      "mean": 8.408,
+      "max": 118,
+      "reason": "?anim=1&t=6 播放相位受初始化耗时影响，非渲染回归：同代码两次加载差异 0/0，命中绘制调用 277 / 三角形 1094203 完全一致"
+    }
+  },
+  "controls": {
+    "desktopMin": 36,
+    "mobileMin": 44
+  },
+  "screenshots": [
+    "after-1280x720-all.png",
+    "after-1280x720-default.png",
+    "after-1280x720-explorer.png",
+    "after-1440x900-all.png",
+    "after-1440x900-default.png",
+    "after-1440x900-explorer.png",
+    "after-1920x1080-all.png",
+    "after-1920x1080-default.png",
+    "after-1920x1080-explorer.png",
+    "before-1280x720-all.png",
+    "before-1280x720-default.png",
+    "before-1280x720-explorer.png",
+    "before-1440x900-all.png",
+    "before-1440x900-default.png",
+    "before-1440x900-explorer.png",
+    "before-1920x1080-all.png",
+    "before-1920x1080-default.png",
+    "before-1920x1080-explorer.png"
+  ],
+  "checkAll": {
+    "pass": true,
+    "steps": [
+      [
+        "shots",
+        93.3
+      ],
+      [
+        "anim",
+        101
+      ],
+      [
+        "equip",
+        92
+      ],
+      [
+        "opt2",
+        93.7
+      ]
+    ]
+  }
+}
