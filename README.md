@@ -487,7 +487,7 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 #### E1 PWA + IndexedDB 快照缓存
 
 - `manifest.webmanifest`：`name/short_name/theme_color #0b141c/background_color/display standalone/start_url ./`，图标 `icons/icon-192.png` `icons/icon-512.png`（[`tools/gen-icons.mjs`](tools/gen-icons.mjs) 用 canvas 程序化绘制，无外部资源），另含 `maskable` 用途。
-- `sw.js`：应用壳（`index.html` / manifest / icons）+ 同源静态资源 **cache-first**，版本号 `VERSION`；`skipWaiting` + `clients.claim`；页面检测到 `installed` 且已有 controller 时弹出「有新版本 · 刷新」提示（`postMessage('SKIP_WAITING')` 后 reload）。导航请求离线回退缓存页；`/diag/` 不缓存。
+- `sw.js`：**导航与 `/src` 代码 network-first**（在线取新、离线回退缓存），其余静态资源 cache-first，版本号 `VERSION`，避免「旧 HTML 配新 JS」的缓存错配；`skipWaiting` + `clients.claim`，页面检测到新版本会提示刷新，已有 controller 时新 SW 接管后自动 reload 一次。导航离线回退缓存页；`/diag/` 不缓存。
 - 注册：`?sw=0` 禁用、`?clean=1` 不注册；因 `main.js` 有顶层 await（快照下载），`load` 事件可能已过，代码按 `document.readyState` 兜底注册。
 - IndexedDB 快照缓存（[`src/idb.js`](src/idb.js)）：key = `baked.bin.gz|v=<BAKED_META.bytes>`，命中直接跳过网络（gzip 与明文两条路径都写缓存），重建快照后 key 自动变化、旧 key 由 `idbPrune()` 清理；隐私模式 / 配额失败静默回退现有逻辑（gzip → 明文 → procedural）。
 
@@ -576,7 +576,7 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 | --- | --- | --- |
 | 左列 `#left-rail` | 透视说明 → 工艺参数 → 设备卡 | flex column，`gap: 8px`，底边留出阶段条 |
 | 右列 `#right-rail` | 菜单按钮 → 设备清单 → 小地图 | 机位/工具收进下拉菜单（见下节），清单/小地图顺序排列 |
-| 底部 `#bar` | 已并入右上菜单（保留占位） | 高度写入 `--bar-h`（ResizeObserver），字幕与流程条据此上移 |
+| 底部 `#bar` | 已移除，机位并入右上菜单 | `--bar-h` 归零，字幕与流程条不再为底部条让位 |
 
 - 审计工具 `node tools/ui-audit.mjs`：7 视口 × 9 状态（默认 / 清单 / 动画 HUD / 流程示意 / 参数 / 透视 / 设备卡 / 导览 / 分享），输出 `diag/ui-audit.json`，标注重叠对、越界、控件最小边长。
 - 结果：重叠 **176 → 0 对**、越界 **10 → 0**、控件最小边长 **20 → 36 px**（窄屏 44 px）；3D 静态帧（`?clean=1`）前后逐像素 **0/0**。
@@ -664,7 +664,7 @@ refinery3d/
 ├── assets/                 # baked.bin / baked.bin.gz / 环境贴图源
 ├── data/layout.json        # D1 35 台设备元数据（19 KB，fetch 预加载 + 内置副本兜底）
 ├── manifest.webmanifest    # E1 PWA 清单
-├── sw.js                   # E1 Service Worker（应用壳 + 静态资源 cache-first）
+├── sw.js                   # E1 Service Worker（导航/代码 network-first，静态资源 cache-first）
 ├── icons/                  # E1 PWA 图标（192/512，canvas 程序化生成）
 ├── tools/                  # serve / 截图 / 动画与拾取校验 / 冒烟 / 打包 / 冷启动 profiling / B 批验收
 ├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批，d = D 批，e = E 批，fix = UI 布局）

@@ -371,7 +371,7 @@
      - 底部：#bar 独占，列区底部留 96px（≥ 条高 + 24）
      - z-index：modal 80 > 卡片/面板 30-32 > 按钮 31 > 字幕 26 > 场景 0
      ================================================================ */
-  :root { --gutter: 42px; --rail-gap: 8px; --bar-h: 36px; }
+  :root { --gutter: 42px; --rail-gap: 8px; --bar-h: 0px; }
   #left-rail, #right-rail {
     position: fixed; display: flex; flex-direction: column; gap: var(--rail-gap);
     pointer-events: none; top: 146px; bottom: 96px;
@@ -686,7 +686,6 @@
     <h1>石油炼化生产场景</h1>
     <p>Petroleum Refining Complex · 3D Model</p>
   </div>
-  <div id="bar"></div>
   <div id="hint">点击设备查看参数 · 拖拽旋转 · 滚轮缩放<br/>1–9 切换机位 · 空格 播放 · ←/→ 阶段 · T 巡游</div>
   <div id="perf"></div>
 </div>

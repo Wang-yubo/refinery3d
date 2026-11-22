@@ -253,6 +253,10 @@ if (!isClean && params.get('sw') !== '0' && 'serviceWorker' in navigator && loca
   const swClose = document.getElementById('sw-close');
   const showSwToast = (show) => swToast?.classList.toggle('show', show);
   swClose?.addEventListener('click', () => showSwToast(false));
+  /* 缓存错配会让旧页面配新代码：已有控制器时，新 SW 接管后自动刷新一次 */
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+  }
   swReload?.addEventListener('click', () => {
     navigator.serviceWorker.controller?.postMessage('SKIP_WAITING');
     location.reload();
@@ -1401,7 +1405,7 @@ document.getElementById('share-btn')?.addEventListener('click', () => qrShare.op
 const narrowUi = () => innerWidth <= 900;
 function syncBarHeight() {
   const el = document.getElementById('bar');
-  document.documentElement.style.setProperty('--bar-h', `${el ? el.offsetHeight : 36}px`);
+  document.documentElement.style.setProperty('--bar-h', `${el ? el.offsetHeight : 0}px`);
 }
 function applyResponsiveUi() {
   syncBarHeight();
