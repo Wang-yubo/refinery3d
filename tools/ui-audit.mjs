@@ -29,19 +29,15 @@ const STATES = [
   },
   {
     id: 'animui', name: '流程动画 HUD', url: '?shot=hero',
-    apply: () => { window.__setShot?.('process'); },
+    apply: () => { document.body.classList.add('anim'); },
   },
   {
     id: 'flow', name: '流程示意 body.flow', url: '?shot=hero',
     apply: () => { document.body.classList.remove('anim'); document.body.classList.add('flow'); },
   },
   {
-    id: 'params', name: '参数面板（流程动画中）', url: '?shot=hero',
-    apply: () => { window.__setShot?.('process'); },
-  },
-  {
-    id: 'menu', name: '机位/工具菜单展开', url: '?shot=hero',
-    apply: () => { document.getElementById('tools-toggle')?.click(); },
+    id: 'params', name: '参数面板', url: '?shot=hero',
+    apply: () => { document.body.classList.remove('anim', 'flow'); document.getElementById('process-panel')?.classList.add('open'); },
   },
   {
     id: 'xray', name: 'X-Ray 开', url: '?shot=hero',
@@ -85,7 +81,6 @@ const collect = () => {
     if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
     if (EXCLUDE_SELF.test(el.id || '')) continue;
     if (el.closest(EXCLUDE_CLOSE)) continue;
-    if (el.id === 'actions' && el.classList.contains('open')) continue; /* 下拉菜单：设计性覆盖 */
     if (el.closest('#qr-modal') && el.id !== 'qr-canvas' && !el.classList.contains('qr-card')) continue;
     const r = vis(el);
     if (!r) continue;
@@ -146,9 +141,6 @@ page.on('pageerror', (e) => errors.push(e.message));
 const report = { generatedAt: new Date().toISOString(), tag: TAG || null, viewports: [], failures: 0, states: STATES.map((s) => s.id) };
 
 const RESET = () => {
-  window.__setShot?.('hero');
-  document.getElementById('actions')?.classList.remove('open');
-  document.getElementById('tools-toggle')?.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('anim', 'flow', 'tour');
   window.__setXray?.(false);
   window.__tourStop?.();

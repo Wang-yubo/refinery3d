@@ -43,14 +43,12 @@ export function createProcessPanel({ isClean, getStage, getOverview }) {
 
   update();
 
-  let opened = false;
+  let opened = !isClean;
   function setOpen(on) {
-    const next = !!on;
-    if (next === opened) return;
-    opened = next;
+    opened = !!on;
     el.classList.toggle('open', opened);
   }
-  setOpen(false);
+  setOpen(!isClean);
 
   return {
     update,

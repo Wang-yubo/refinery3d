@@ -77,7 +77,7 @@ node tools/serve.mjs . 4321
 | `audio` | `1` / `0` | D2 环境音：`1` 首次手势后自动开启，`0` 强制关闭（默认静音） |
 | `sw` | `0` | E1：不注册 Service Worker（默认注册） |
 | `xray` | `1` | E4：启动即开启透视 |
-| `params` | — | 工艺参数面板：默认仅在「工艺流程动画」进行中显示；`1` 强制显示，`0` 永不显示 |
+| `params` | `0` | E3：隐藏工艺参数面板 |
 | `normal` | `1` | 开启 B 批法线贴图（默认关闭：1440p 下填充率开销 -33%，超出预算） |
 | `motion` | `0` | 关闭 B 批动态细节（旗帜 / 鸟群 / 蒸汽随风），用于像素对比 |
 | `st` | base64url | 分享链接状态（机位 / 相机位姿 / 画质 / 选中设备 / 动画阶段与时间），见「分享链接」 |
@@ -515,7 +515,7 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 
 #### E3 工艺参数面板 + 物料平衡条
 
-[`src/data/process.js`](src/data/process.js)（6 阶段：温度 / 压力 / 处理量 / 主收率 / 4 项物料平衡 + 说明）+ [`src/processpanel.js`](src/processpanel.js)（玻璃拟态面板 `#process-panel`）：随阶段切换更新，合计恒为 100%，默认仅在工艺流程动画期间显示（`?params=1` 强制、`?params=0` 关闭）；数据与工艺流线解耦，后续可直接替换为 DCS 实测值。
+[`src/data/process.js`](src/data/process.js)（6 阶段：温度 / 压力 / 处理量 / 主收率 / 4 项物料平衡 + 说明）+ [`src/processpanel.js`](src/processpanel.js)（玻璃拟态面板 `#process-panel`）：随阶段切换更新，合计恒为 100%，`?params=0` 可关；数据与工艺流线解耦，后续可直接替换为 DCS 实测值。
 
 | 验收 | 1920×1080 | 1280×800 |
 | --- | --- | --- |
@@ -554,7 +554,7 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 | --- | --- |
 | `?sw=0` | 不注册 Service Worker |
 | `?xray=1` | 启动即开启透视 |
-| `?params=0` / `?params=1` | 永不显示 / 强制显示工艺参数面板（默认仅动画期间显示） |
+| `?params=0` | 隐藏工艺参数面板 |
 
 | API | 说明 |
 | --- | --- |
@@ -564,8 +564,6 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 | `__qrState()` | 二维码与物料平衡数据 |
 | `__processState()` | 参数面板状态 `{open,stage,hidden}` |
 | `__cacheState` | 快照缓存 `{source,ms,bytes,key,idb}` |
-| `__toolsState()` | 机位 / 工具菜单 `{open}` |
-| `__applyResponsiveUi()` | 重新应用窄屏折叠规则 |
 | `__swState` | Service Worker `{registered,active,scope}` |
 
 ### fix/ui-layout：浮层布局审计与修复
@@ -575,20 +573,13 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 | 区域 | 内容 | 规则 |
 | --- | --- | --- |
 | 左列 `#left-rail` | 透视说明 → 工艺参数 → 设备卡 | flex column，`gap: 8px`，底边留出阶段条 |
-| 右列 `#right-rail` | 菜单按钮 → 设备清单 → 小地图 | 机位/工具收进下拉菜单（见下节），清单/小地图顺序排列 |
-| 底部 `#bar` | 已并入右上菜单（保留占位） | 高度写入 `--bar-h`（ResizeObserver），字幕与流程条据此上移 |
+| 右列 `#right-rail` | 按钮群 → 设备清单 → 小地图 | 按钮 `flex-wrap` 右上对齐，清单/小地图顺序排列 |
+| 底部 `#bar` | 机位 / 阶段按钮 | 高度写入 `--bar-h`（ResizeObserver），字幕与流程条据此上移 ≥8 px |
 
 - 审计工具 `node tools/ui-audit.mjs`：7 视口 × 9 状态（默认 / 清单 / 动画 HUD / 流程示意 / 参数 / 透视 / 设备卡 / 导览 / 分享），输出 `diag/ui-audit.json`，标注重叠对、越界、控件最小边长。
 - 结果：重叠 **176 → 0 对**、越界 **10 → 0**、控件最小边长 **20 → 36 px**（窄屏 44 px）；3D 静态帧（`?clean=1`）前后逐像素 **0/0**。
 - 窄屏（≤900px）：清单默认折叠、小地图隐藏、参数面板默认收起；左列卡片打开时右列清单让位（`:has()`）。`body.clean` 下两列整体隐藏。
 - 前后对比截图：`renders/fix/{before,after}-<视口>-{default,explorer,all}.png`（1920/1440/1280）。
-
-### UI 收敛：机位 / 工具菜单 + 参数面板按需显示
-
-- 首页不再铺开 17 个按钮：10 个机位 + 「工艺流程动画」放在 `#shot-grid`，画质 / 环境音 / 透视 / 导出 4K / 录制巡游 / 分享链接 / 导览放在 `#tool-grid`，整体收进右上角「☰ 机位 / 工具」下拉；默认只保留一个入口，`Esc`、点击面板外或选中机位后自动关闭，数字键 1–9 不受影响。
-- 工艺参数面板不再常驻：仅当工艺流程动画处于活动状态（`anim.isActive()`）时自动打开，退出动画即关闭；`?params=1` 强制显示，`?params=0` 永不显示。
-- 回归：7 视口 × 10 状态（新增「菜单展开」）共 **70 组合，重叠 0 对、越界 0、最小控件 36 px（窄屏 44 px）**；菜单面板在 1440 / 1280 / 390 下均完整落在视口内，面板内 17 个按钮两两无重叠（`diag/ui-audit.json`）。
-- 相关 API：`__toolsState()` → `{open}`；`__applyResponsiveUi()` 重新应用窄屏折叠。
 
 ### 一键冒烟 / CI
 
