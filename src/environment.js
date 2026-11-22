@@ -46,8 +46,8 @@ export const PRESETS = {
     sunIntensity: 1.25,
     hemiSky: 0x4a5f80,
     hemiGround: 0x1a1c22,
-    hemiIntensity: 0.6,
-    ambient: 0.16,
+    hemiIntensity: 0.82,
+    ambient: 0.30,
     skyTop: 0x0a1734,
     skyHorizon: 0x4d5c86,
     skyGround: 0x0b1220,
@@ -55,9 +55,9 @@ export const PRESETS = {
     fogDensity: 0.0010,
     stars: 0.35,
     cloudy: 0.28,
-    exposure: 1.32,
-    bloom: { strength: 0.8, radius: 0.72, threshold: 0.78 },
-    lampWarm: 3.4,
+    exposure: 1.42,
+    bloom: { strength: 0.9, radius: 0.74, threshold: 0.74 },
+    lampWarm: 4.4,
   },
 };
 

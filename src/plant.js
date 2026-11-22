@@ -507,6 +507,14 @@ function createNightGlow(m, g = new THREE.Group()) {
   add(-112, 14, 145, 4, 0.4);
   add(-80, 9, 142, 4, 0.4);
   add(125, 11, 134, 4, 0.4);
+  // B4：结构层间作业灯（钢构/走道）+ 装车区高杆灯 + 火炬基座
+  for (const x of [81.5, 98.5]) for (const z of [-88.5, -71.5]) add(x, 30.5, z, 3.6, 0.5);
+  for (const [x, z] of [[61, 42], [79, 42], [52, 42], [88, 42]]) add(x, 23, z, 3.4, 0.45);
+  add(-40.5, 9.6, -22, 3.6, 0.5);
+  add(-26, 56, -56, 4.4, 0.5);
+  for (const x of [150, 196]) add(x, 19, 70, 7.5, 0.7);
+  add(196, 19, 100, 7.5, 0.7);
+  add(126, 12, 146, 4.2, 0.45);
   // flare base work lights
   add(168, 6, -116, 6, 0.6, 0xffa347);
   g.visible = false;

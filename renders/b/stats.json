@@ -1,0 +1,214 @@
+{
+  "generatedAt": "2026-11-22T05:35:52.674Z",
+  "baselineCommit": "d9775d8",
+  "note": "9 张 1920x1080 clean high；extras 为专项近景/天气/夜间。FPS 为 2560x1440 rAF 中位帧时（无头 Chrome）。",
+  "shots": {
+    "aerial": {
+      "mean": 115.7,
+      "clipPct": 0,
+      "darkPct": 0,
+      "meanBase": 115.6,
+      "meanDelta": 0.1,
+      "calls": 704,
+      "triangles": 1106245
+    },
+    "hero": {
+      "mean": 124.5,
+      "clipPct": 0,
+      "darkPct": 0,
+      "meanBase": 122.9,
+      "meanDelta": 1.6,
+      "calls": 602,
+      "triangles": 1104114
+    },
+    "cdu": {
+      "mean": 113.5,
+      "clipPct": 0,
+      "darkPct": 0.1,
+      "meanBase": 112.9,
+      "meanDelta": 0.6,
+      "calls": 269,
+      "triangles": 1091625
+    },
+    "tanks": {
+      "mean": 125.9,
+      "clipPct": 0,
+      "darkPct": 0,
+      "meanBase": 123.6,
+      "meanDelta": 2.3,
+      "calls": 390,
+      "triangles": 1093154
+    },
+    "fcc": {
+      "mean": 117.6,
+      "clipPct": 0,
+      "darkPct": 0,
+      "meanBase": 117.5,
+      "meanDelta": 0.1,
+      "calls": 237,
+      "triangles": 1087877
+    },
+    "night": {
+      "mean": 91.8,
+      "clipPct": 0.21,
+      "darkPct": 0,
+      "meanBase": 73.6,
+      "meanDelta": 18.2,
+      "calls": 768,
+      "triangles": 1106373
+    },
+    "flow": {
+      "mean": 107.1,
+      "clipPct": 0.07,
+      "darkPct": 0,
+      "meanBase": 103.6,
+      "meanDelta": 3.5,
+      "calls": 726,
+      "triangles": 1107071
+    },
+    "day": {
+      "mean": 143.1,
+      "clipPct": 0,
+      "darkPct": 0,
+      "meanBase": 144.5,
+      "meanDelta": -1.4,
+      "calls": 704,
+      "triangles": 1106245
+    },
+    "top": {
+      "mean": 139.2,
+      "clipPct": 0,
+      "darkPct": 0,
+      "meanBase": 139.4,
+      "meanDelta": -0.2,
+      "calls": 664,
+      "triangles": 1104978
+    }
+  },
+  "extras": {
+    "b1": {
+      "mean": 151,
+      "clipPct": 0,
+      "file": "renders/b/b1-material.png"
+    },
+    "b2": {
+      "mean": 136.7,
+      "clipPct": 0,
+      "file": "renders/b/b2-structure.png"
+    },
+    "b4": {
+      "mean": 91.8,
+      "clipPct": 0.21
+    },
+    "rain": {
+      "mean": 74.6,
+      "clipPct": 0,
+      "file": "renders/b/b3-rain.png"
+    },
+    "snow": {
+      "mean": 91.5,
+      "clipPct": 0,
+      "file": "renders/b/b3-snow.png"
+    },
+    "fog": {
+      "mean": 76.5,
+      "clipPct": 0,
+      "file": "renders/b/b3-fog.png"
+    },
+    "clear": {
+      "mean": 120.9,
+      "clipPct": 0,
+      "file": "renders/b/b3-clear.png"
+    },
+    "b5": {
+      "mean": 119.4,
+      "clipPct": 0,
+      "file": "renders/b/b5-motion.png"
+    }
+  },
+  "perf": {
+    "day": {
+      "frames": 48,
+      "medMs": 16.7,
+      "fps": 59.9
+    },
+    "night": {
+      "frames": 55,
+      "medMs": 50,
+      "fps": 20
+    },
+    "rain": {
+      "frames": 61,
+      "medMs": 50,
+      "fps": 20
+    },
+    "baseline": {
+      "day": {
+        "frames": 61,
+        "medMs": 33.4,
+        "fps": 29.9
+      },
+      "night": {
+        "frames": 64,
+        "medMs": 50,
+        "fps": 20
+      },
+      "rain": {
+        "frames": 67,
+        "medMs": 50,
+        "fps": 20
+      }
+    },
+    "calls": 605,
+    "callsBaseline": 587
+  },
+  "verify": {
+    "bakedParity": {
+      "mean": 1.997,
+      "max": 178.7,
+      "over2Pct": 12.87,
+      "hist": [
+        45.4,
+        34.8,
+        10.3,
+        1.7,
+        0.7,
+        0.6,
+        0.7,
+        5.8
+      ],
+      "pass": true
+    },
+    "pickingHitPct": 100,
+    "weather": {
+      "clear1": 123.2,
+      "rain": 74.2,
+      "snow": 97.4,
+      "fog": 80.5,
+      "clear2": 122.6,
+      "clearRoundTripDiff": 0.6,
+      "clearRoundTrip": true,
+      "state": {
+        "name": "clear",
+        "time": 0,
+        "visible": false
+      }
+    },
+    "replay": {
+      "mean": 0.001,
+      "max": 22,
+      "over2Pct": 0,
+      "hist": [
+        100,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "calls": 605
+  }
+}

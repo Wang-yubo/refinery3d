@@ -8,4 +8,5 @@ diag/
 tools/*.png
 tools/verify-*.mjs
 !tools/verify-equip.mjs
+!tools/verify-b.mjs
 tools/timing-check.mjs

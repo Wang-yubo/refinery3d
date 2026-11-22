@@ -7,6 +7,9 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createMaterials } from './materials.js';
 import { createSky, createLights, createGround, createGroundLite, createHills, applyPreset, PRESETS } from './environment.js';
 import { createPlant, createPlantDecor } from './plant.js';
+import { addStructureDetails } from './details.js';
+import { createWeather } from './weather.js';
+import { createMotion } from './motion.js';
 import { bakeStatic } from './helpers.js';
 import { createAnimation } from './animation.js';
 import { createExplorer } from './explorer.js';
@@ -228,6 +231,9 @@ if (!plant) {
   nightGlow = built.nightGlow;
   tlog('plant built'); mark('plant-built');
 }
+/* B2：装置细节（钢构 / 平台 / 楼梯 / 桥架 / 消防立管 / 阀门组 / 保温捆扎带）。
+ * 只在实时建模路径添加，预烘焙路径由快照携带（重建快照见 tools/build-baked.mjs） */
+if (!usingPrebaked) { addStructureDetails(plant, m); mark('details-added'); }
 scene.add(plant);
 window.__prebaked = usingPrebaked;
 
@@ -247,6 +253,8 @@ for (const [x, y, z, color, dist] of [
   [-30, 16, 86, 0xffd6a8, 100],
   [-160, 18, 55, 0xffc98c, 120],
   [120, 16, 146, 0xffd6a8, 100],
+  [61, 12, 42, 0xffd6a8, 110],
+  [-40, 12, -22, 0xffd0a0, 110],
 ]) {
   const l = new THREE.PointLight(color, 1100, dist, 2);
   l.visible = false;
@@ -730,6 +738,8 @@ function animate() {
   tourCostMs += performance.now() - tTour;
   controls.update();
   if (interact) interact.update(dt);
+  weather?.update(dt);
+  if (!motionOff) motion?.update(dt);
   const tExp = performance.now();
   explorer?.update(dt);
   explorerCostMs += performance.now() - tExp;
@@ -865,6 +875,7 @@ async function upgradeToFull() {
   mark('full-look-done');
   /* 分享链接的状态在完整画质就绪后落地，避免被 PMREM / 分档覆盖 */
   try { share?.applyFromUrl(); } catch (err) { console.warn('[share] restore failed', err.message); }
+  try { if (params.get('weather')) weather?.set(params.get('weather')); } catch (err) { console.warn('[weather] restore failed', err.message); }
   render();
   mark('full-render-done');
   fullReady = true;
@@ -1112,6 +1123,7 @@ window.__animOverview = () => {
 };
 window.__setAnimTime = (t = 0) => {
   anim.setTime(t);
+  motion?.setTime(t);
   render();
   return anim.state.time;
 };
@@ -1206,6 +1218,9 @@ if (prep !== 'none') {
 let explorer = null;
 let tour = null;
 let share = null;
+let weather = null;
+let motion = null;
+const motionOff = params.get('motion') === '0';
 if (!isClean) {
   explorer = createExplorer({ interact, camera, controls, isClean });
   tour = createTour({ camera, controls, anim, interact, isClean });
@@ -1230,6 +1245,22 @@ if (!isClean) {
     isClean,
   });
 }
+
+/* B3：天气（粒子 + 湿滑 + 雾/天空叠加），默认 clear 不影响现有截图 */
+weather = createWeather({
+  scene, camera, m, skyUniforms, renderer, lights,
+  getQuality: () => quality,
+  getPreset: () => currentPreset,
+  onClear: () => applyLook(currentPreset),
+});
+window.__setWeather = (name) => weather.set(name);
+window.__weatherState = () => weather.state();
+window.__setWeatherTime = (t) => weather.setTime(t);
+window.__resumeTime = () => { motion?.resume(); weather?.resume(); return true; };
+
+/* B5：动态细节（蒸汽随风 / 旗帜 / 鸟群），显式时钟驱动 */
+motion = createMotion({ scene, plant, m, getQuality: () => quality });
+window.__motionState = () => motion.state();
 
 const initial = params.get('shot') || 'aerial';
 mark('set-shot-start');

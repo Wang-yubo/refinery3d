@@ -73,6 +73,9 @@ node tools/serve.mjs . 4321
 | `autoexposure` | `0` | 关闭自动曝光（锁定在预设曝光） |
 | `prebaked` | `1` / `0` | 默认开启烘焙快照；`0` 等同 `procedural=1` |
 | `profile` | `1` | 包装 `gl.linkProgram` / `compileShader` 做启动诊断 |
+| `weather` | `clear` / `rain` / `snow` / `fog` | B 批天气；默认 `clear`（与现有截图一致） |
+| `normal` | `1` | 开启 B 批法线贴图（默认关闭：1440p 下填充率开销 -33%，超出预算） |
+| `motion` | `0` | 关闭 B 批动态细节（旗帜 / 鸟群 / 蒸汽随风），用于像素对比 |
 | `st` | base64url | 分享链接状态（机位 / 相机位姿 / 画质 / 选中设备 / 动画阶段与时间），见「分享链接」 |
 
 > `?st=` 与上述参数兼容：机位、画质由链接里的值覆盖，其余参数（`clean`、`procedural`、`stats`…）保持不变。
@@ -145,6 +148,7 @@ node tools/serve.mjs . 4321
 | `window.__setFXAA(on)` | FXAA 开关 |
 | `window.__setCinematic(on)` | 电影感后处理开关 |
 | `window.__setExposure(v)` | 固定曝光（关闭自适应） |
+| `window.__setAutoExposure(on)` | 开关自动曝光（`false` 时钉住预设曝光，像素对比用） |
 | `window.__shadowInfo()` | 阴影相机尺寸、贴图大小与焦点 |
 | `window.__setStats(on)` / `window.__perf()` | 性能面板；`{fps, calls, triangles, quality, pixelRatio, ao, dof, fxaa, bloom, exposure}` |
 
@@ -195,6 +199,17 @@ node tools/serve.mjs . 4321
 | `window.__shareUrl()` | 生成分享链接（含 `?st=`），长度约 180–220 字符 |
 | `window.__shareCopy()` | 复制到剪贴板，返回 `{url, len}` |
 | `window.__applyShare(stateOrRaw)` / `__shareRestore()` | 应用分享状态 / 从当前 URL 的 `?st=` 恢复 |
+
+**天气与动态细节（B 批）**
+
+| API | 说明 |
+| --- | --- |
+| `window.__setWeather(name)` | 切换天气 `clear` / `rain` / `snow` / `fog`，同步调整粒子、湿滑材质、雾与天空 |
+| `window.__weatherState()` | `{name, time, visible}` |
+| `window.__weatherName` | 当前天气名（字符串，脚本用） |
+| `window.__setWeatherTime(t)` | 把天气粒子时钟钉在 t 秒（冻结推进；`-1` 之后可 `__resumeTime()` 恢复） |
+| `window.__motionState()` | `{time, flags, birds, steam}` 动态细节统计 |
+| `window.__resumeTime()` | 恢复天气 / 动效时钟推进 |
 
 **诊断（A6b）**
 
@@ -330,6 +345,44 @@ node tools/profile-startup.mjs --query "?shot=hero" --prep compile   # 指定机
 - **C5 部署与文档**：本文件补齐 URL 参数表、API 表、静态部署与目录结构；仓库根目录加 `.nojekyll`，可直接作为 GitHub Pages / 任意静态站点的子目录发布。
 - **C6 代码结构（未做）**：`src/animation.js` 拆分（`data/stages.js` / `flow.js` / `tour.js` / `hud.js`）与 `data/layout.json` 抽离本轮未实施——收益只是可维护性，改动面覆盖 1000+ 行且要重跑全部像素回归，按「时间不够可只做数据抽离、不强行拆文件」的约定留到下一批。
 
+### B 批改动（细节与氛围）
+
+不改变工艺流程数据与设备坐标；17 张既有截图的机位与构图未动。9 张效果图亮度均值与 C 批基线相比：aerial +0.1 / hero +1.6 / cdu +0.6 / tanks +2.3 / fcc +0.1 / flow +3.5 / day -1.4 / top -0.2（均 ≤±4，clip ≤0.07%）；night 按 B4 目标单独由 73.6 提升到 91.8。
+
+![材质细节：罐体雨痕与钢结构粗糙度](renders/b/b1-material.png)
+![结构细节：FCC / 重整框架、层间平台与桥架](renders/b/b2-structure.png)
+![夜间灯光](renders/b/b4-night.png)
+
+- **B1 材质升级**（[`src/textures.js`](src/textures.js)、[`src/materials.js`](src/materials.js)）：新增 5 张程序化贴图——粗糙度（竖向雨痕 + 斑块）、法线（噪声高度场求导）、污渍（乘到 `map` 上的淡痕）、罐体雨痕（`shellWeatheredTexture`，替换原罐体壳板）、沥青油污（油斑 / 裂缝 / 修补块）。金属度与粗糙度按类别分档：钢构 0.78/0.38、钢构（深）0.75/0.44、管道 0.84–0.88/0.30–0.36、保温 0.32–0.35/0.50–0.64、罐体 0.32/0.46–0.50、混凝土 0/0.80–0.90、沥青 0.05/0.90。所有 PBR 材质统一补 `roughnessMap` / `normalMap` 占位，保持单一 shader 变体（draw calls 与 C 批一致）；`m.__applyWet(on)` 提供湿滑变体（粗糙度 ×0.42、金属度 +0.16、`envMapIntensity` ×1.7、颜色 ×0.82，可逆），供 B3 天气复用。
+- **B2 装置细节**（[`src/details.js`](src/details.js)）：FCC 再生器 17×17 四层钢构框架 + 3 层连接走道 + 落地楼梯、反应器 12×12 框架 + 层间走道、反应器↔再生器 20 m 空中走道、鼓风机房 / 主分馏塔电缆桥架、2 处消防立管、2 组阀门组、催化剂立管与烟道的保温捆扎带；重整三塔之间 7/15/22 m 三层走道（按塔半径断开，避免穿模）+ 端头楼梯 + 桥架 + 立管 + 阀门组；常减压塔区楼梯与检修平台、换热器区桥架与阀门组、2 处消防立管、塔顶蒸汽线捆扎带。全部复用既有材质，烘焙后不新增 draw call：新增三角面 **+63 k**（1,045,837 → 1,109,189），`assets/baked.bin` 21.6 → 22.3 MB（gz 2.90 → 3.13 MB），快照 meshes 42 → 41。
+- **B4 夜间灯光**（[`src/plant.js`](src/plant.js)、[`src/environment.js`](src/environment.js)）：新增 20 余处作业灯 / 高杆灯 / 平台灯 glow（FCC 框架四角、重整走道、常压塔楼梯、装车区高杆灯、减压塔顶），夜间环境光 0.24（+50%）、半球光 0.72（+20%）、曝光 1.32→1.42、Bloom 0.8→0.9、阈值 0.78→0.74，灯罩自发光 3.4→4.4；另加 2 盏夜间点光源。night 亮度均值 **73.6 → 91.8**（目标 88–105），clip 0.21%，dark 0%。
+- **B3 天气与时间**（[`src/weather.js`](src/weather.js)）：`?weather=rain|snow|fog` 与 `__setWeather(name)`；雨 1800 / 雪 1200 个粒子（显式时钟驱动，低画质档关闭），雨滴在 4 处有顶棚区域按高度裁剪不穿透；雨天/雪天/雾天分别调整太阳强度、雾密度、天空与星点，并开启湿滑材质。实测 clear → rain → clear 往返亮度差 **0.5**；rain / snow / fog 均值 74.6 / 91.5 / 76.5，clip 0%，无 console error。
+- **B5 动态细节**（[`src/motion.js`](src/motion.js)）：蒸汽/烟羽随风向缓慢变化（风向 0.22 rad 摆幅、风速 ±35%）、3 面旗帜顶点级摆动、9 只远处鸟群；全部由显式时钟驱动并与 `__setAnimTime(t)` 同步（`__setWeatherTime(t)` 冻结粒子时钟）。冻结时钟后两次同机位截图 **100% 像素一致**（mean 0.00）。低画质档关闭旗帜与鸟群。
+- **B6 环境音（未做）**：WebAudio 合成厂区低频 / 蒸汽泄放需要额外的音频授权与 UI，本轮时间不足未实施。
+
+**预烘焙 / 程序化一致性**：重建快照后同机位（hero 视角、1600×900、`autoexposure=0`、`motion=0`）逐像素比较，平均差 **1.96/255**（≤2 的门槛内，差异集中在动态对象与 AA 边缘），说明几何 / 材质两路一致。拾取：35 台设备中可见的 33 台，投影中心点击 **33/33** 命中设备（点击空白处为 null），代理与视觉未错位。
+
+**B 批性能（2560×1440 无头 Chrome，rAF 中位帧时）**
+
+| 场景 | 基线 d9775d8 | B 批 | 结论 |
+| --- | --- | --- | --- |
+| day（high） | 33.4 ms | 16.7 ms | 无回退（均被 16.7/33.4 的 vsync 台阶量化） |
+| night（high） | 50.0 ms | 50.0 ms | 0%，满足 ≤10% |
+| rain（high） | 50.0 ms | 50.0 ms | 0%，满足 ≤20% |
+
+**已知取舍**
+
+- 法线贴图在 1440p 实测带来约 **-33%** 填充率开销（day 16.7 → 50 ms），超出「high 档 -15%」预算，因此**默认关闭**，仅保留 `roughnessMap` + 污渍/雨痕贴图；需要更细腻的近景可用 `?normal=1` 打开（代码路径与贴图都在）。
+- 贴图未做 UV 重排，仅按材质调整重复次数，近景仍能看到轻微拉伸；新增贴图 5 张（预算 ≤6）。
+- 树木已合并进烘焙几何，摆动需要顶点着色器变体（会增加 program 数并影响阴影），本轮放弃；罐车前后灯依赖 `animation.js` 内部车辆数组，为避免动工艺流程数据未改。
+- 无头 Chrome 的 rAF 只有 16.7 / 33.4 / 50 ms 几个台阶，上表只能证明「没有跨过更差的台阶」，不能替代真机 GPU 测量。
+
+```bash
+node tools/b-shots.mjs --tag run --extras   # 9 张效果图 + renders/b/*.png + diag/b-run.json
+node tools/verify-b.mjs                     # 预烘焙一致性 / 拾取 / 天气往返 / 重放 / FPS
+node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
+```
+
 ### 一键冒烟 / CI
 
 ```bash
@@ -383,6 +436,9 @@ refinery3d/
 │   ├── explorer.js         # C1 设备清单 + 搜索 + 小地图
 │   ├── share.js            # C2 分享链接状态序列化
 │   ├── tour.js             # C3 导览模式（字幕 / 语音 / 播放控制）
+│   ├── details.js          # B2 装置细节（钢构 / 平台 / 楼梯 / 桥架 / 立管 / 阀门组 / 保温捆扎带）
+│   ├── weather.js          # B3 天气（雨雪粒子 + 湿滑 + 雾/天空叠加）
+│   ├── motion.js           # B5 动态细节（蒸汽随风 / 旗帜 / 鸟群）
 │   ├── interaction.js      # 设备代理拾取、卡片、聚焦机位（35 台）
 │   ├── postfx.js           # SSAO / Bloom / DOF / FXAA / 电影感后处理
 │   ├── quality.js          # 三档画质参数与自动探测
@@ -391,8 +447,8 @@ refinery3d/
 │   └── prof.js             # 冷启动打点 / GL 链路包装 / __renderInfo
 ├── vendor/                 # three.js r160 + addons（仓库内，无 CDN）
 ├── assets/                 # baked.bin / baked.bin.gz / 环境贴图源
-├── tools/                  # serve / 截图 / 动画校验 / 拾取校验 / 冒烟 / 打包 / 冷启动 profiling
-├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b）
+├── tools/                  # serve / 截图 / 动画与拾取校验 / 冒烟 / 打包 / 冷启动 profiling / B 批验收
+├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批）
 └── .github/workflows/ci.yml
 ```
 

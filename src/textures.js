@@ -240,3 +240,187 @@ export function smokeTexture(seed = 61) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+/* ================= B 批：PBR 辅助贴图（粗糙度 / 法线 / 污渍 / 雨痕） ================= */
+
+/** 数据纹理（粗糙度 / 法线）：不要做 sRGB 解码 */
+function dataTex(c, repeatX = 1, repeatY = 1) {
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeatX, repeatY);
+  t.colorSpace = THREE.NoColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+/** 1×1 数据纹理：给 PBR 材质补默认 rough / normal，让所有材质共享同一 shader 变体 */
+export function solidDataTexture(r, g, b, repeatX = 1, repeatY = 1) {
+  const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeatX, repeatY);
+  t.colorSpace = THREE.NoColorSpace;
+  t.needsUpdate = true;
+  return t;
+}
+
+/** 粗糙度贴图：灰度噪声 + 竖向雨痕 + 斑块（钢构 / 管道 / 罐体通用） */
+export function metalRoughTexture(seed = 71) {
+  const { c, ctx } = canvas(512);
+  const r = rng(seed);
+  ctx.fillStyle = '#c8c8c8';          // 基准粗糙度 ~0.78
+  ctx.fillRect(0, 0, 512, 512);
+  // 大块明暗：局部更光滑 / 更粗糙
+  for (let i = 0; i < 60; i++) {
+    const x = r() * 512, y = r() * 512, rad = 20 + r() * 90;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    const v = 150 + r() * 100;
+    g.addColorStop(0, `rgba(${v},${v},${v},0.22)`);
+    g.addColorStop(1, 'rgba(200,200,200,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.3); ctx.fill();
+  }
+  noiseDots(ctx, 512, 512, r, 6000, ['#9a9a9a', '#e2e2e2'], 0.14);
+  // 竖向雨痕：粗糙度更高的浅色条
+  for (let i = 0; i < 40; i++) {
+    const x = r() * 512, top = r() * 200, len = 120 + r() * 300, w = 1 + r() * 5;
+    const g = ctx.createLinearGradient(0, top, 0, top + len);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.3, `rgba(255,255,255,${0.10 + r() * 0.16})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, top, w, len);
+  }
+  return dataTex(c);
+}
+
+/** 法线贴图：由噪声高度场求导，给钢板/保温层一点起伏（幅度很小，不破坏轮廓） */
+export function metalNormalTexture(seed = 73) {
+  const size = 256;
+  const { c, ctx } = canvas(size);
+  const r = rng(seed);
+  const h = new Float32Array(size * size);
+  // 三层噪声高度场
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size, v = y / size;
+      h[y * size + x] = 0.5
+        + 0.28 * Math.sin(u * 21.3 + Math.sin(v * 9.1) * 1.7)
+        + 0.16 * Math.sin(v * 33.7 + Math.cos(u * 13.4) * 2.1)
+        + 0.10 * (r() - 0.5);
+    }
+  }
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const l = h[y * size + ((x - 1 + size) % size)];
+      const rr = h[y * size + ((x + 1) % size)];
+      const d = h[((y - 1 + size) % size) * size + x];
+      const u = h[((y + 1) % size) * size + x];
+      const nx = (rr - l) * 1.1, ny = (u - d) * 1.1;
+      const len = Math.hypot(nx, ny, 1);
+      const i = (y * size + x) * 4;
+      img.data[i] = ((nx / len) * 0.5 + 0.5) * 255;
+      img.data[i + 1] = ((ny / len) * 0.5 + 0.5) * 255;
+      img.data[i + 2] = ((1 / len) * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return dataTex(c);
+}
+
+/** 污渍 / 水痕（乘到 map 上，整体偏亮，只压暗局部） */
+export function grimeTexture(seed = 77) {
+  const { c, ctx } = canvas(512);
+  const r = rng(seed);
+  ctx.fillStyle = '#f2f2f2';
+  ctx.fillRect(0, 0, 512, 512);
+  // 雨水冲刷的竖向淡痕
+  streaks(ctx, 512, 512, r, 46, 'rgba(150,146,138,0.5)', 0.16, 9);
+  // 横向水渍 / 泥点
+  for (let i = 0; i < 26; i++) {
+    const x = r() * 512, y = r() * 512, w = 30 + r() * 150, hh = 3 + r() * 12;
+    ctx.globalAlpha = 0.05 + r() * 0.09;
+    ctx.fillStyle = '#8e8a80';
+    ctx.beginPath(); ctx.ellipse(x, y, w * 0.5, hh * 0.5, r() * 3, 0, 6.3); ctx.fill();
+  }
+  noiseDots(ctx, 512, 512, r, 5000, ['#cfccc4', '#ffffff'], 0.10);
+  ctx.globalAlpha = 1;
+  return finish(c);
+}
+
+/** 罐体竖向雨痕（比 shellTexture 更强的 streaking，用于储罐/球罐） */
+export function shellWeatheredTexture(seed = 79, base = '#d8d8d2') {
+  const { c, ctx } = canvas(512);
+  const r = rng(seed);
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, 512, 512);
+  // 竖向雨痕：从顶部往下，越往下越淡
+  for (let i = 0; i < 120; i++) {
+    const x = r() * 512, w = 1 + r() * 10;
+    const top = r() * 60, bottom = 260 + r() * 250;
+    const g = ctx.createLinearGradient(0, top, 0, bottom);
+    g.addColorStop(0, `rgba(120,112,98,${0.05 + r() * 0.10})`);
+    g.addColorStop(0.7, `rgba(120,112,98,${0.02 + r() * 0.05})`);
+    g.addColorStop(1, 'rgba(120,112,98,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, top, w, bottom - top);
+  }
+  // 环向焊缝 + 竖向板缝
+  for (let i = 0; i < 4; i++) {
+    const y = 40 + i * 120;
+    ctx.fillStyle = 'rgba(96,94,88,0.18)';
+    ctx.fillRect(0, y, 512, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.fillRect(0, y + 2, 512, 1);
+  }
+  for (let i = 0; i < 8; i++) {
+    ctx.fillStyle = 'rgba(88,86,82,0.13)';
+    ctx.fillRect(i * 64, 0, 1.5, 512);
+  }
+  noiseDots(ctx, 512, 512, r, 4000, ['#c2c2bc', '#ecece6'], 0.10);
+  // 底部锈迹
+  for (let i = 0; i < 90; i++) {
+    ctx.globalAlpha = 0.04 + r() * 0.10;
+    ctx.fillStyle = '#8a5a34';
+    const x = r() * 512, y = 360 + r() * 150;
+    ctx.beginPath(); ctx.ellipse(x, y, 2 + r() * 9, 1 + r() * 5, 0, 0, 6.3); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  return finish(c);
+}
+
+/** 沥青路面：油污斑 + 轮胎压痕 + 修补块 */
+export function asphaltOilTexture(seed = 83) {
+  const { c, ctx } = canvas(512);
+  const r = rng(seed);
+  ctx.fillStyle = '#4a4a4a';
+  ctx.fillRect(0, 0, 512, 512);
+  noiseDots(ctx, 512, 512, r, 12000, ['#3a3a3a', '#606060', '#8a8a86'], 0.16);
+  // 油污：更暗更"湿"的斑块
+  for (let i = 0; i < 18; i++) {
+    const x = r() * 512, y = r() * 512, rad = 10 + r() * 46;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, 'rgba(16,15,14,0.40)');
+    g.addColorStop(0.6, 'rgba(28,26,24,0.20)');
+    g.addColorStop(1, 'rgba(30,28,26,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.3); ctx.fill();
+  }
+  // 修补块 / 裂缝
+  for (let i = 0; i < 6; i++) {
+    ctx.strokeStyle = 'rgba(24,24,22,0.35)';
+    ctx.lineWidth = 1 + r() * 2;
+    ctx.beginPath();
+    let x = r() * 512, y = r() * 512;
+    ctx.moveTo(x, y);
+    for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 90; y += (r() - 0.5) * 90; ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  for (let i = 0; i < 8; i++) {
+    ctx.globalAlpha = 0.10 + r() * 0.12;
+    ctx.fillStyle = '#6e6e6a';
+    ctx.fillRect(r() * 512, r() * 512, 20 + r() * 70, 14 + r() * 50);
+  }
+  ctx.globalAlpha = 1;
+  return finish(c);
+}
