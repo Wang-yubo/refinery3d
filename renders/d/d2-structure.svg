@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="620" viewBox="0 0 1080 620" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+  <rect width="1080" height="620" fill="#0d1620"/>
+  <text x="40" y="52" fill="#d7e7f2" font-size="22" letter-spacing="2">D1 代码结构：animation.js 拆分 + 设备元数据外置</text>
+  <text x="40" y="80" fill="#7f95a6" font-size="13">箭头 = import 方向；共 28 个源文件 / 45 条相对依赖 / 0 循环（node tools/check-imports.mjs）</text>
+
+  <!-- main.js -->
+  <rect x="40" y="120" width="190" height="66" rx="4" fill="#14222f" stroke="#5fd0ff" stroke-opacity="0.55"/>
+  <text x="56" y="146" fill="#d7e7f2" font-size="14">src/main.js</text>
+  <text x="56" y="168" fill="#7f95a6" font-size="11">引导 / 渲染循环 / __ API</text>
+
+  <!-- animation facade -->
+  <rect x="300" y="120" width="220" height="66" rx="4" fill="#1a2b3a" stroke="#5fd0ff" stroke-opacity="0.8"/>
+  <text x="316" y="146" fill="#d7e7f2" font-size="14">src/animation.js（façade）</text>
+  <text x="316" y="168" fill="#7f95a6" font-size="11">createAnimation(...) · 环境动效</text>
+
+  <!-- anim modules -->
+  <rect x="590" y="96" width="180" height="58" rx="4" fill="#14222f" stroke="#7fe8ff" stroke-opacity="0.45"/>
+  <text x="604" y="120" fill="#d7e7f2" font-size="13">src/anim/flow.js</text>
+  <text x="604" y="139" fill="#7f95a6" font-size="10.5">流线 + 粒子 + 光环</text>
+
+  <rect x="590" y="164" width="180" height="58" rx="4" fill="#14222f" stroke="#7fe8ff" stroke-opacity="0.45"/>
+  <text x="604" y="188" fill="#d7e7f2" font-size="13">src/anim/tour.js</text>
+  <text x="604" y="207" fill="#7f95a6" font-size="10.5">机位 / flyTo 缓动</text>
+
+  <rect x="590" y="232" width="180" height="58" rx="4" fill="#14222f" stroke="#7fe8ff" stroke-opacity="0.45"/>
+  <text x="604" y="256" fill="#d7e7f2" font-size="13">src/anim/hud.js</text>
+  <text x="604" y="275" fill="#7f95a6" font-size="10.5">阶段面板 / 进度 / 按钮</text>
+
+  <rect x="590" y="300" width="180" height="40" rx="4" fill="#101c26" stroke="#4a6274"/>
+  <text x="604" y="325" fill="#a8c4d8" font-size="12">src/anim/util.js（V/lerp/hash）</text>
+
+  <!-- data -->
+  <rect x="300" y="252" width="220" height="86" rx="4" fill="#16242f" stroke="#ffd27a" stroke-opacity="0.5"/>
+  <text x="316" y="276" fill="#d7e7f2" font-size="13">src/data/stages.js</text>
+  <text x="316" y="296" fill="#7f95a6" font-size="10.5">6 阶段 / 流线路径配色 / 机位</text>
+  <text x="316" y="313" fill="#7f95a6" font-size="10.5">时长 DUR / 粒子 shader / 常量</text>
+
+  <rect x="300" y="366" width="220" height="86" rx="4" fill="#16242f" stroke="#ffd27a" stroke-opacity="0.5"/>
+  <text x="316" y="390" fill="#d7e7f2" font-size="13">src/data/layout.js</text>
+  <text x="316" y="410" fill="#7f95a6" font-size="10.5">fetch 预加载 + 缓存</text>
+  <text x="316" y="427" fill="#7f95a6" font-size="10.5">失败回退内置副本（不白屏）</text>
+
+  <rect x="590" y="366" width="180" height="60" rx="4" fill="#16242f" stroke="#ffd27a" stroke-opacity="0.5"/>
+  <text x="604" y="390" fill="#d7e7f2" font-size="13">data/layout.json</text>
+  <text x="604" y="409" fill="#7f95a6" font-size="10.5">35 台设备元数据（19 KB）</text>
+
+  <!-- interaction -->
+  <rect x="40" y="252" width="190" height="66" rx="4" fill="#14222f" stroke="#5fd0ff" stroke-opacity="0.55"/>
+  <text x="56" y="278" fill="#d7e7f2" font-size="14">src/interaction.js</text>
+  <text x="56" y="300" fill="#7f95a6" font-size="11">拾取代理 / 卡片 / 聚焦</text>
+
+  <!-- audio -->
+  <rect x="40" y="366" width="190" height="66" rx="4" fill="#14222f" stroke="#9fe9ff" stroke-opacity="0.55"/>
+  <text x="56" y="392" fill="#d7e7f2" font-size="14">src/audio.js（D2）</text>
+  <text x="56" y="414" fill="#7f95a6" font-size="11">WebAudio 环境音（默认静音）</text>
+
+  <!-- arrows -->
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#5fd0ff" fill-opacity="0.7"/>
+    </marker>
+  </defs>
+  <g stroke="#5fd0ff" stroke-opacity="0.5" fill="none" marker-end="url(#a)">
+    <path d="M230,153 L300,153"/>
+    <path d="M520,140 L590,124"/>
+    <path d="M520,152 L590,190"/>
+    <path d="M520,166 L590,258"/>
+    <path d="M520,178 L486,252" stroke-dasharray="4 4"/>
+    <path d="M520,190 L486,366" stroke-dasharray="4 4"/>
+    <path d="M230,285 L300,285"/>
+    <path d="M230,400 L300,400" stroke-dasharray="4 4"/>
+    <path d="M520,400 L590,396"/>
+    <path d="M230,170 L300,400" stroke-dasharray="2 5" stroke-opacity="0.3"/>
+  </g>
+
+  <text x="40" y="492" fill="#7f95a6" font-size="12">行数变化：animation.js 1034 → 520 ｜ interaction.js 548 → 326 ｜ 新增 stages.js 216 / layout.js 72 / flow.js 208 / tour.js 52 / hud.js 97 / util.js 11 / audio.js 206</text>
+  <text x="40" y="520" fill="#7f95a6" font-size="12">对外 API 不变：main.js 仍调用 createAnimation(...) 与 window.__anim* / __equip* / __tour* / __share*；新增 __audioState / __setAudio</text>
+  <text x="40" y="548" fill="#7f95a6" font-size="12">验收：同机位 / 同阶段 / 同 t 像素差 mean 0.00、max 0（3 个用例）；35 台设备包围盒中心差 0；anim check ALL PASSED</text>
+  <text x="40" y="576" fill="#4a6274" font-size="11">虚线 = 数据 / 可选依赖；实线 = 运行时 import</text>
+</svg>

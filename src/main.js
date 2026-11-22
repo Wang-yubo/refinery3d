@@ -14,6 +14,7 @@ import { bakeStatic } from './helpers.js';
 import { createAnimation } from './animation.js';
 import { createExplorer } from './explorer.js';
 import { createShare } from './share.js';
+import { createAudio } from './audio.js';
 import { createTour } from './tour.js';
 import { createInteraction } from './interaction.js';
 import { createContactShadows } from './contacts.js';
@@ -1220,6 +1221,7 @@ let tour = null;
 let share = null;
 let weather = null;
 let motion = null;
+let audio = null;
 const motionOff = params.get('motion') === '0';
 if (!isClean) {
   explorer = createExplorer({ interact, camera, controls, isClean });
@@ -1253,6 +1255,37 @@ weather = createWeather({
   getPreset: () => currentPreset,
   onClear: () => applyLook(currentPreset),
 });
+/* ------------------------------------------------------------------ */
+/* D2：环境音（默认静音；?audio=1 或记忆为开时，等首次手势再创建 ctx）    */
+/* ------------------------------------------------------------------ */
+audio = createAudio({
+  onStateChange: () => syncAudioButton(),
+});
+const audioBtn = document.getElementById('audio-btn');
+function syncAudioButton() {
+  if (!audioBtn) return;
+  const st = audio.state();
+  const label = st.on ? '♪ 环境音 开' : st.on === false && audio.armed ? '♪ 环境音 待启动' : '♪ 环境音';
+  audioBtn.textContent = label;
+  audioBtn.classList.toggle('on', !!st.on);
+  audioBtn.title = st.on ? '点击关闭环境音（会淡出并挂起 AudioContext）' : '环境音（默认静音）：厂区低频轰鸣 + 间歇蒸汽泄放';
+}
+if (audioBtn) {
+  audioBtn.addEventListener('click', () => {
+    const want = !audio.state().on;
+    audio.cancelArm();
+    audio.setOn(want);
+  });
+}
+/* 与 clean 无关：按钮隐藏但音频状态照常（?audio=1 仍需首次手势） */
+const aParam = params.get('audio');
+if (aParam === '1') audio.arm();
+else if (aParam === '0') audio.setOn(false);
+else if (audio.stored() === '1') audio.arm();
+syncAudioButton();
+window.__audioState = () => ({ ...audio.state(), armed: audio.armed });
+window.__setAudio = (v) => { audio.cancelArm(); return audio.setOn(!!v); };
+
 window.__setWeather = (name) => weather.set(name);
 window.__weatherState = () => weather.state();
 window.__setWeatherTime = (t) => weather.setTime(t);

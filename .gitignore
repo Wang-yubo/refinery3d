@@ -9,4 +9,5 @@ tools/*.png
 tools/verify-*.mjs
 !tools/verify-equip.mjs
 !tools/verify-b.mjs
+!tools/verify-d.mjs
 tools/timing-check.mjs

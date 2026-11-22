@@ -74,6 +74,7 @@ node tools/serve.mjs . 4321
 | `prebaked` | `1` / `0` | 默认开启烘焙快照；`0` 等同 `procedural=1` |
 | `profile` | `1` | 包装 `gl.linkProgram` / `compileShader` 做启动诊断 |
 | `weather` | `clear` / `rain` / `snow` / `fog` | B 批天气；默认 `clear`（与现有截图一致） |
+| `audio` | `1` / `0` | D2 环境音：`1` 首次手势后自动开启，`0` 强制关闭（默认静音） |
 | `normal` | `1` | 开启 B 批法线贴图（默认关闭：1440p 下填充率开销 -33%，超出预算） |
 | `motion` | `0` | 关闭 B 批动态细节（旗帜 / 鸟群 / 蒸汽随风），用于像素对比 |
 | `st` | base64url | 分享链接状态（机位 / 相机位姿 / 画质 / 选中设备 / 动画阶段与时间），见「分享链接」 |
@@ -210,6 +211,13 @@ node tools/serve.mjs . 4321
 | `window.__setWeatherTime(t)` | 把天气粒子时钟钉在 t 秒（冻结推进；`-1` 之后可 `__resumeTime()` 恢复） |
 | `window.__motionState()` | `{time, flags, birds, steam}` 动态细节统计 |
 | `window.__resumeTime()` | 恢复天气 / 动效时钟推进 |
+
+**环境音（D2）**
+
+| API | 说明 |
+| --- | --- |
+| `window.__audioState()` | `{on, want, ctx, volume, steamBursts, armed}`（`ctx` 为 `none`/`running`/`suspended`） |
+| `window.__setAudio(on)` | 开关环境音（淡入/淡出 + 挂起），返回当前开关状态 |
 
 **诊断（A6b）**
 
@@ -383,6 +391,74 @@ node tools/verify-b.mjs                     # 预烘焙一致性 / 拾取 / 天�
 node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 ```
 
+### D 批：结构重构与环境音
+
+不改画面观感、工艺数据与既有截图构图。全部验收数据见 [`renders/d/stats.json`](renders/d/stats.json)。
+
+![HUD 环境音按钮（开启态）](renders/d/d1-hud-audio.png)
+![D1 代码结构](renders/d/d2-structure.svg)
+
+#### D1 代码结构重构
+
+**数据抽离**
+
+- [`src/data/stages.js`](src/data/stages.js)（新增 216 行）：6 个阶段定义（编号 / 中英文名 / 说明 / 焦点坐标 / 光环半径 / 配色 / 阶段机位）、6 条物料流线的路径点与配色、阶段时长 `DUR`、粒子与管线 shader、空冷器与调和罐组常量。纯数据 + 纯函数，不依赖场景对象。
+- [`data/layout.json`](data/layout.json)（新增，19 KB）：35 台设备的 `id / unit / kind / cn / en / x / z / w / h / d / cy / desc / specs / view`（包围盒中心与尺寸即拾取代理与聚焦机位的输入）。由 [`src/data/layout.js`](src/data/layout.js)（新增 72 行）负责 `fetch` 预加载 + 缓存；**加载失败时回退模块内置副本**（`layoutSync()`），界面不会白屏。内置副本由 [`tools/gen-layout.mjs`](tools/gen-layout.mjs) 从 JSON 同步生成并校验（35 台 / 唯一 id / 必填字段）。
+- [`src/interaction.js`](src/interaction.js)：548 → **326 行**，只保留拾取代理、选中高亮、卡片与聚焦逻辑；`buildItems()` 的 220 行硬编码整体移除。
+
+**模块拆分**
+
+| 文件 | 内容 | 行数 |
+| --- | --- | --- |
+| [`src/animation.js`](src/animation.js) | façade：`createAnimation(...)`、环境动效（蒸汽 / 火炬 / 风扇 / 罐车 / 鹤管） | 1034 → **520** |
+| [`src/anim/flow.js`](src/anim/flow.js) | 流线 + 粒子（`Stream` 类）、阶段光环、阶段聚光灯 | 208 |
+| [`src/anim/tour.js`](src/anim/tour.js) | 机位应用、`flyTo` 补间、`updateTween` | 52 |
+| [`src/anim/hud.js`](src/anim/hud.js) | 阶段面板 / 时间轴 / 按钮绑定 | 97 |
+| [`src/anim/util.js`](src/anim/util.js) | `V` / `lerp` / `clamp01` / `easeInOutCubic` / `hash` | 11 |
+
+主入口调用方式与 `window.__*` API 完全不变（`main.js` 仍只 `createAnimation(...)`；`STAGES` / `DUR` 仍从 `animation.js` 再导出，`tour.js` 无需改动）。`node tools/check-imports.mjs`：**28 个源文件 / 45 条相对依赖 / 0 循环**。
+
+**D1 验收**
+
+| 检查 | 结果 |
+| --- | --- |
+| `node tools/anim.mjs check` | **ALL CHECKS PASSED** |
+| 同机位 / 同阶段 / 同 t 像素差（3 个用例：stage2 t=9、stage4 t=5、自定义流线机位） | mean **0.00** / max **0**（全部像素完全一致） |
+| 35 台设备包围盒中心差 | **0**（`maxCenterDelta = 0`，`__equipList()` 完全一致） |
+| 流线数据（`__flowInfo()`） | 6 条，路径 / 配色 / 阶段完全一致 |
+| `node tools/check-docs.mjs` | DOCS OK |
+
+#### D2 环境音
+
+[`src/audio.js`](src/audio.js)（新增 206 行）用 WebAudio 程序化合成，**默认静音**：
+
+- **低频轰鸣**：4 s brown noise 循环 → lowpass ≈170 Hz → 增益 0.55，再由 0.06 Hz LFO 调制截止频率（±48 Hz），模拟厂区持续背景轰鸣。
+- **间歇蒸汽**：6–14 s 随机间隔触发一次 0.6–1.3 s 的 bandpass 噪声包络（中心 900–2300 Hz、快起慢落），峰值增益 0.05–0.10，克制不突兀；不做报警声 / 爆炸声，也不随阶段切歌。
+- **默认静音 + 手势门控**：模块加载时**不创建 AudioContext**（避免 autoplay 警告）；只有点击 HUD 喇叭按钮或 `?audio=1` 后的首次手势才 `new AudioContext()` + `resume()`，并 1.2 s 淡入。
+- **开关与记忆**：再次点击 0.5 s 淡出，随后 `suspend()` 释放音频线程；开关写 `localStorage['refinery3d.audio']`，下次访问自动恢复（仍需手势）。
+- `visibilitychange` 隐藏时自动 `suspend()`，回到前台恢复（不改变用户开关意图）。
+- HUD 按钮 `#audio-btn`（右下角、与分享/导览同款小按钮），文案在 `♪ 环境音` / `♪ 环境音 开` 间切换；`?clean=1` 下按钮隐藏，**音频状态与 API 不受影响**。
+
+**参数 / API**
+
+| 参数 / API | 说明 |
+| --- | --- |
+| `?audio=1` | 首次用户手势后自动开启（无手势不创建 AudioContext）；`?audio=0` 强制关闭并清空记忆 |
+| `window.__audioState()` | `{on, want, ctx, volume, steamBursts, armed}` |
+| `window.__setAudio(on)` | 脚本开关（淡入 / 淡出 + 挂起），返回布尔 |
+
+**D2 验收**
+
+| 检查 | 结果 |
+| --- | --- |
+| 默认静音 / 无 autoplay 警告 / 无 console 错误 | `ctx = "none"`、`on = false`、`errors = 0` |
+| 点击开启 / 再点关闭 | `ctx: none → running → suspended`，按钮文案同步 |
+| `localStorage` 记忆 | 写入 `"1"`，二次访问自动 `armed`，首次手势后 `running` |
+| 隐藏标签页 | `ctx = "suspended"`，回前台恢复 |
+| 蒸汽包络 | 16 s 内触发 **2** 次（`steamBursts = 2`） |
+| 帧开销 | rAF 中位帧时 开/关均 **16.7 ms**，开销 **0%**（音频图运行在音频线程，无逐帧 JS） |
+| `?clean=1` | 按钮隐藏（`offsetParent === null`），`?audio=1` 仍按手势开启 |
+
 ### 一键冒烟 / CI
 
 ```bash
@@ -440,6 +516,9 @@ refinery3d/
 │   ├── weather.js          # B3 天气（雨雪粒子 + 湿滑 + 雾/天空叠加）
 │   ├── motion.js           # B5 动态细节（蒸汽随风 / 旗帜 / 鸟群）
 │   ├── interaction.js      # 设备代理拾取、卡片、聚焦机位（35 台）
+│   ├── audio.js            # D2 环境音（WebAudio 合成，默认静音）
+│   ├── anim/               # D1 拆分：flow.js（流线粒子）/ tour.js（镜头缓动）/ hud.js（面板）/ util.js
+│   ├── data/               # D1 数据：stages.js（阶段 / 流线 / 机位）/ layout.js（设备元数据加载器）
 │   ├── postfx.js           # SSAO / Bloom / DOF / FXAA / 电影感后处理
 │   ├── quality.js          # 三档画质参数与自动探测
 │   ├── prebaked.js         # 烘焙快照下载（gzip）+ 零拷贝重建
@@ -447,8 +526,9 @@ refinery3d/
 │   └── prof.js             # 冷启动打点 / GL 链路包装 / __renderInfo
 ├── vendor/                 # three.js r160 + addons（仓库内，无 CDN）
 ├── assets/                 # baked.bin / baked.bin.gz / 环境贴图源
+├── data/layout.json        # D1 35 台设备元数据（19 KB，fetch 预加载 + 内置副本兜底）
 ├── tools/                  # serve / 截图 / 动画与拾取校验 / 冒烟 / 打包 / 冷启动 profiling / B 批验收
-├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批）
+├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批，d = D 批）
 └── .github/workflows/ci.yml
 ```
 

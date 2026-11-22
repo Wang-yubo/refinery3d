@@ -1,218 +1,21 @@
+/* ==================================================================== */
+/*  石油炼化工艺流程动画（facade）                                       */
+/*  - 数据：src/data/stages.js（阶段 / 流线 / 机位 / 时长）                */
+/*  - 拆分：src/anim/flow.js（流线粒子）· tour.js（镜头缓动）· hud.js（面板） */
+/*  - 对外仍只导出 createAnimation(...)，main.js 与 window.__* API 不变     */
+/* ==================================================================== */
 import * as THREE from 'three';
 import { mark } from './prof.js';
-import { box, cyl, pipeRun, leaderLine, bakeStatic, labelSprite, makeGlow } from './helpers.js';
+import { box, cyl, pipeRun, labelSprite, leaderLine, bakeStatic, makeGlow } from './helpers.js';
 import { tankTruck } from './units.js';
+import { DUR, STAGES, AIR_COOLERS, BLEND_TANKS } from './data/stages.js';
+import { V, hash, clamp01 } from './anim/util.js';
+import { createFlow } from './anim/flow.js';
+import { createHud } from './anim/hud.js';
+import { createTourCam } from './anim/tour.js';
 
-/* ==================================================================== */
-/*  石油炼化工艺流程动画                                                 */
-/*  - 6 个工艺阶段 / 物料流动粒子 / 阶段高亮 / 自动巡游 / 环境动效          */
-/*  - 所有动画都由显式时间 t 驱动（不用 Math.random），可复现截图           */
-/* ==================================================================== */
-
-const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const lerp = (a, b, k) => a + (b - a) * k;
-const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-const hash = (i) => {
-  const s = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-const DUR = 12; // 每个阶段的时长（秒，1x）
-
-/* ------------------------------------------------------------------ */
-/* 阶段定义：场景坐标 / 机位 / 中英文名 / 说明                            */
-/* ------------------------------------------------------------------ */
-export const STAGES = [
-  {
-    num: '01',
-    cn: '原油储运',
-    en: 'CRUDE OIL STORAGE & TRANSPORT',
-    desc: '原油自码头与罐区经泵组、计量和管廊送入常减压装置，浮顶罐维持稳定进料。',
-    focus: [-156, 0, -6],
-    ring: 58,
-    color: 0xffa22e,
-    cam: { pos: [-320, 52, 96], target: [-158, 16, -6], fov: 46 },
-  },
-  {
-    num: '02',
-    cn: '常减压蒸馏',
-    en: 'CRUDE DISTILLATION · CDU / VDU',
-    desc: '原油经换热网络升温后进入加热炉，在常压塔与减压塔中按沸点分馏为石脑油、煤油、柴油与渣油。',
-    focus: [-46, 0, -34],
-    ring: 46,
-    color: 0xff6a3a,
-    cam: { pos: [36, 20, 34], target: [-44, 30, -38], fov: 47 },
-  },
-  {
-    num: '03',
-    cn: '催化裂化',
-    en: 'FLUID CATALYTIC CRACKING · FCC',
-    desc: '重质油在反应器与再生器之间循环裂化，生成高辛烷值汽油与液化气；再生烟气经烟囱排放。',
-    focus: [92, 0, -74],
-    ring: 52,
-    color: 0xff8a3c,
-    cam: { pos: [4, 18, 4], target: [100, 36, -84], fov: 48 },
-  },
-  {
-    num: '04',
-    cn: '重整 / 加氢',
-    en: 'CATALYTIC REFORMING & HYDROTREATING',
-    desc: '石脑油在重整反应器中转化为高辛烷值组分，加氢精制脱除硫、氮，全面提升油品质量。',
-    focus: [70, 0, 44],
-    ring: 44,
-    color: 0xffd27a,
-    cam: { pos: [150, 44, 126], target: [72, 24, 44], fov: 45 },
-  },
-  {
-    num: '05',
-    cn: '产品调和',
-    en: 'PRODUCT BLENDING',
-    desc: '各组分油按配方在线调和为 92 / 95 号汽油与柴油，经化验合格后转入成品罐区。',
-    focus: [132, 0, 48],
-    ring: 32,
-    color: 0x7fe8ff,
-    cam: { pos: [98, 34, 104], target: [134, 10, 50], fov: 44 },
-  },
-  {
-    num: '06',
-    cn: '装卸出厂',
-    en: 'TRUCK LOADING & DISPATCH',
-    desc: '成品油经装车鹤管定量装入罐车，计量、封铅后经地衡驶出厂区，完成全流程交付。',
-    focus: [172, 0, 74],
-    ring: 34,
-    color: 0x9fe9ff,
-    cam: { pos: [238, 26, 128], target: [172, 10, 72], fov: 46 },
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/* 物料流线：3 类配色（原油 / 高温油气 / 成品油）                         */
-/* ------------------------------------------------------------------ */
-const STREAMS = [
-  {
-    id: 'crude',
-    name: '原油',
-    color: 0xffa22e,
-    stages: [0, 1],
-    speed: 11,
-    particles: 34,
-    points: [
-      [-186, 6.0, -8], [-158, 6.0, -8], [-124, 6.0, -8], [-104, 6.0, -8],
-      [-96, 6.4, -6], [-96, 11.4, -6], [-96, 11.4, 8], [-84, 11.4, 8], [-72, 11.4, 8],
-      [-72, 8.0, 2], [-72, 5.2, -4], [-68, 5.2, -4],
-    ],
-  },
-  {
-    id: 'vapor',
-    name: '高温油气',
-    color: 0xff4d1e,
-    stages: [1, 2],
-    speed: 15,
-    particles: 46,
-    points: [
-      [-48, 58.6, -30], [-48, 63.0, -30], [-36, 63.0, -36], [-30, 55.0, -50], [-26, 51.0, -56],
-      [14, 56.0, -56], [14, 56.0, -22], [14, 12.0, -20], [14, 11.4, 8], [30, 11.4, 8], [52, 11.4, 8],
-      [58, 10.6, 6], [58, 10.6, -20], [58, 10.6, -52], [58, 7.2, -64], [64, 7.2, -72], [70, 7.2, -74],
-    ],
-  },
-  {
-    id: 'fcc',
-    name: '催化汽油',
-    color: 0xff7a2f,
-    stages: [2, 3],
-    speed: 13,
-    particles: 40,
-    points: [
-      [112, 24, -52], [112, 20, -52], [112, 9, -56], [108, 6.4, -48], [108, 6.4, -20],
-      [108, 11.6, 8], [100, 11.6, 8], [60, 11.6, 8], [56, 11.6, 10], [52, 11.6, 14], [52, 11.6, 34],
-      [52, 7.6, 40], [48, 4.4, 44], [48, 4.4, 66], [50, 4.8, 70],
-    ],
-  },
-  {
-    id: 'reform',
-    name: '重整汽油',
-    color: 0xffd27a,
-    stages: [3, 4],
-    speed: 10,
-    particles: 30,
-    points: [
-      [70, 28.5, 42], [70, 33, 42], [88, 33, 42], [104, 33, 42], [112, 31, 46],
-      [120, 28, 48], [126, 22, 46], [132, 17, 44], [132, 13.5, 44],
-    ],
-  },
-  {
-    id: 'product',
-    name: '成品油',
-    color: 0x7fe8ff,
-    stages: [4, 5],
-    speed: 9,
-    particles: 26,
-    points: [
-      [144, 13.5, 44], [148, 10, 50], [150, 8.4, 58], [152, 7.6, 66], [158, 7.6, 72], [168, 7.6, 74],
-    ],
-  },
-  {
-    id: 'flare',
-    name: '火炬排放',
-    color: 0xff3a14,
-    stages: [2],
-    speed: 8,
-    particles: 22,
-    points: [
-      [96, 6, -92], [112, 6, -100], [132, 6, -106], [152, 6, -114], [166, 6, -120], [172, 6, -120],
-    ],
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/* shaders                                                             */
-/* ------------------------------------------------------------------ */
-const POINT_VERT = /* glsl */ `
-  attribute vec3 aColor;
-  attribute float aSize;
-  uniform float uSize;
-  varying vec3 vColor;
-  void main() {
-    vColor = aColor;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = clamp(uSize * aSize * 900.0 / max(1.0, -mv.z), 1.5, 18.0);
-    gl_Position = projectionMatrix * mv;
-  }`;
-
-const POINT_FRAG = /* glsl */ `
-  uniform sampler2D uMap;
-  uniform float uOpacity;
-  varying vec3 vColor;
-  void main() {
-    float a = texture2D(uMap, gl_PointCoord).a;
-    if (a < 0.004) discard;
-    gl_FragColor = vec4(vColor * (0.6 + 1.25 * a), a * uOpacity);
-  }`;
-
-const TUBE_VERT = /* glsl */ `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }`;
-
-const TUBE_FRAG = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uOpacity;
-  uniform float uTime;
-  uniform float uSpeed;
-  uniform float uRepeat;
-  varying vec2 vUv;
-  void main() {
-    float x = fract(vUv.x * uRepeat - uTime * uSpeed);
-    float head = smoothstep(0.0, 0.05, x);
-    float tail = 1.0 - smoothstep(0.16, 0.95, x);
-    float dash = head * tail;
-    float a = uOpacity * (0.16 + 0.95 * dash);
-    vec3 col = uColor * (0.55 + 2.1 * dash);
-    gl_FragColor = vec4(col, a);
-  }`;
+/* 兼容旧引用：tour.js 等模块从 animation.js 取 STAGES / DUR */
+export { STAGES, DUR } from './data/stages.js';
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */
@@ -256,17 +59,6 @@ function makeFanInstances(m) {
   return inst;
 }
 
-const AIR_COOLERS = [
-  { x: -28, z: 8, w: 12 },
-  { x: 8, z: 6, w: 12 },
-  { x: -52, z: 8, w: 12 },
-  { x: 92, z: -58, w: 11 },
-  { x: 104, z: -58, w: 11 },
-];
-
-/* ------------------------------------------------------------------ */
-/* main factory                                                        */
-/* ------------------------------------------------------------------ */
 export function createAnimation({ scene, camera, controls, m, plant, labels, setLook = () => {}, isNight = () => false }) {
   /* ---------------- groups ---------------- */
   const staticRoot = new THREE.Group(); // 新增的静态设施（调和罐区）
@@ -278,15 +70,49 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   flowRoot.visible = false;
   scene.add(staticRoot, envRoot, flowRoot);
 
+
+  const glowTex = m.glowTex; // 环境 glow 精灵共用贴图
+
+  const state = {
+    active: false,
+    overview: false,
+    playing: false,
+    cruise: true,
+    speed: 1,
+    stage: 0,
+    stageElapsed: 0,
+    time: 0,
+    tween: null,
+    lastHud: 0,
+    hudCache: '',
+  };
+
+  /* ---------------- api（流线 / 光环 / 状态机） ---------------- */
+  const flow = createFlow({ flowRoot, m, state });
+  const api = {
+    streams: flow.streams,
+    spot: flow.spot,
+    stages: STAGES,
+    state,
+    time: 0,
+    update,
+    enter,
+    exit,
+    gotoStage,
+    setTime,
+    play,
+    pause,
+    setSpeed,
+    setCruise,
+    overview: overviewMode,
+    isActive: () => state.active,
+  };
+
+
   mark('anim-blend-start');
   /* ---------------- product blending unit ---------------- */
   const blendGroup = new THREE.Group();
   blendGroup.name = 'blending';
-  const BLEND_TANKS = [
-    [120, 44],
-    [132, 44],
-    [144, 44],
-  ];
   for (const [x, z] of BLEND_TANKS) {
     blendGroup.add(cyl(5.3, 5.6, 0.6, m.concreteSmooth, x, 0.3, z, 28));
     blendGroup.add(cyl(4.2, 4.28, 10, m.shellWhite, x, 5.6, z, 32));
@@ -316,135 +142,6 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   labels.add(blendLeader);
 
   mark('anim-blend-done');
-  /* ---------------- flow streams ---------------- */
-  const glowTex = m.glowTex;
-  const _tmp = new THREE.Vector3();
-
-  class Stream {
-    constructor(def) {
-      this.def = def;
-      this.curve = new THREE.CatmullRomCurve3(def.points.map((p) => V(...p)), false, 'catmullrom', 0.28);
-      this.len = Math.max(1, this.curve.getLength());
-      const tubular = Math.max(80, Math.round(this.len / 5));
-      const tubeGeo = new THREE.TubeGeometry(this.curve, tubular, 0.42, 5, false);
-      this.lineMat = new THREE.ShaderMaterial({
-        uniforms: {
-          uColor: { value: new THREE.Color(def.color) },
-          uOpacity: { value: 0.2 },
-          uTime: { value: 0 },
-          uSpeed: { value: def.speed / 9 },
-          uRepeat: { value: this.len / 9 },
-        },
-        vertexShader: TUBE_VERT,
-        fragmentShader: TUBE_FRAG,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      this.tube = new THREE.Mesh(tubeGeo, this.lineMat);
-      this.tube.frustumCulled = false;
-
-      const n = def.particles;
-      this.n = n;
-      const pos = new Float32Array(n * 3);
-      const col = new Float32Array(n * 3);
-      const siz = new Float32Array(n);
-      const base = new THREE.Color(def.color);
-      this.offsets = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const c = base.clone().offsetHSL((hash(i * 3.7) - 0.5) * 0.1, 0, (hash(i * 5.1) - 0.5) * 0.18);
-        col[i * 3] = c.r;
-        col[i * 3 + 1] = c.g;
-        col[i * 3 + 2] = c.b;
-        siz[i] = 0.55 + hash(i * 9.3) * 0.95;
-        this.offsets[i] = (i / n + hash(i * 2.3) * 0.02) % 1;
-      }
-      const pgeo = new THREE.BufferGeometry();
-      pgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      pgeo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
-      pgeo.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
-      this.pointMat = new THREE.ShaderMaterial({
-        uniforms: { uMap: { value: glowTex }, uOpacity: { value: 0.7 }, uSize: { value: 1.0 } },
-        vertexShader: POINT_VERT,
-        fragmentShader: POINT_FRAG,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      this.points = new THREE.Points(pgeo, this.pointMat);
-      this.points.frustumCulled = false;
-
-      this.group = new THREE.Group();
-      this.group.add(this.tube, this.points);
-      flowRoot.add(this.group);
-
-      this.opacity = 0.2;
-      this.speed = def.speed;
-    }
-
-    update(t, active, dt, snap = false) {
-      const target = active ? 1.0 : 0.32;
-      this.opacity = snap ? target : lerp(this.opacity, target, 1 - Math.exp(-dt * 3.2));
-      const v = this.def.speed * (active ? 1 : 0.45);
-      this.lineMat.uniforms.uOpacity.value = this.opacity * 0.62;
-      this.lineMat.uniforms.uTime.value = t;
-      this.lineMat.uniforms.uSpeed.value = v / 9;
-      this.pointMat.uniforms.uOpacity.value = this.opacity * 0.95;
-      this.pointMat.uniforms.uSize.value = active ? 1.15 : 0.78;
-      const du = v / this.len;
-      const pos = this.points.geometry.attributes.position;
-      for (let i = 0; i < this.n; i++) {
-        let u = (this.offsets[i] + t * du) % 1;
-        if (u < 0) u += 1;
-        this.curve.getPointAt(u, _tmp);
-        pos.setXYZ(i, _tmp.x, _tmp.y, _tmp.z);
-      }
-      pos.needsUpdate = true;
-    }
-  }
-
-  const streams = STREAMS.map((def) => new Stream(def));
-
-  mark('anim-streams-done');
-  /* ---------------- stage rings ---------------- */
-  const ringGroups = [];
-  for (const s of STAGES) {
-    const g = new THREE.Group();
-    g.position.set(s.focus[0], 0.5, s.focus[2]);
-    const mkRing = (r, w, op) => {
-      const mesh = new THREE.Mesh(
-        new THREE.RingGeometry(Math.max(0.1, r - w), r, 96),
-        new THREE.MeshBasicMaterial({
-          color: s.color, transparent: true, opacity: op,
-          blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-        })
-      );
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.frustumCulled = false;
-      g.add(mesh);
-      return mesh;
-    };
-    const outer = mkRing(s.ring, s.ring * 0.03, 0.0);
-    const inner = mkRing(s.ring * 0.72, s.ring * 0.012, 0.0);
-    const aura = makeGlow(glowTex, s.color, s.ring * 1.9, 0.0);
-    aura.position.y = 2.4;
-    g.add(aura);
-    flowRoot.add(g);
-    ringGroups.push({ group: g, outer, inner, aura, stage: s });
-  }
-
-  mark('anim-rings-done');
-  /* ---------------- stage spot light ---------------- */
-  const spotTarget = new THREE.Object3D();
-  const spot = new THREE.SpotLight(0xffd7a6, 0, 230, 0.48, 0.72, 2);
-  spot.castShadow = false;
-  spot.visible = false;
-  spotTarget.position.set(0, 0, 0);
-  flowRoot.add(spot, spotTarget);
-  spot.target = spotTarget;
-
-  mark('anim-spot-done');
   /* ---------------- environment: smoke / steam ---------------- */
   const smoke = [];
   plant.traverse((o) => {
@@ -584,179 +281,10 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     pumpDiscs.push({ holder, phase: hash(pumpDiscs.length * 2.9) * 6.28 });
   }
 
-  /* ================================================================== */
-  /* HUD / state                                                        */
-  /* ================================================================== */
-  const $ = (id) => document.getElementById(id);
-  const elPanel = $('apanel');
-  const elNum = $('astage-num');
-  const elCn = $('astage-cn');
-  const elEn = $('astage-en');
-  const elDesc = $('astage-desc');
-  const elDots = $('adots');
-  const elBar = $('abar');
-  const elTime = $('atime');
-  const elPlay = document.querySelector('#animui [data-act="play"]');
-  const elCruise = document.querySelector('#animui [data-act="cruise"]');
-  const speedBtns = Array.from(document.querySelectorAll('#animui [data-speed]'));
-  const dotEls = [];
-  if (elDots) {
-    for (let i = 0; i < STAGES.length; i++) {
-      const d = document.createElement('span');
-      d.textContent = STAGES[i].num;
-      elDots.appendChild(d);
-      dotEls.push(d);
-    }
-  }
 
-  const state = {
-    active: false,
-    overview: false,
-    playing: false,
-    cruise: true,
-    speed: 1,
-    stage: 0,
-    stageElapsed: 0,
-    time: 0,
-    tween: null,
-    lastHud: 0,
-    hudCache: '',
-  };
-
-  const api = {
-    streams,
-    spot,
-    stages: STAGES,
-    state,
-    time: 0,
-    update,
-    enter,
-    exit,
-    gotoStage,
-    setTime,
-    play,
-    pause,
-    setSpeed,
-    setCruise,
-    overview: overviewMode,
-    isActive: () => state.active,
-  };
-
-  mark('anim-arms-done');
-  /* ---------------- camera ---------------- */
-  function camApply(cam) {
-    camera.position.set(cam.pos[0], cam.pos[1], cam.pos[2]);
-    controls.target.set(cam.target[0], cam.target[1], cam.target[2]);
-    camera.fov = cam.fov;
-    camera.updateProjectionMatrix();
-    camera.lookAt(controls.target);
-    controls.update();
-  }
-
-  function flyTo(cam, { immediate = false, dur = 2.0 } = {}) {
-    if (immediate || dur <= 0) {
-      state.tween = null;
-      controls.enabled = true;
-      camApply(cam);
-      return;
-    }
-    state.tween = {
-      t: 0,
-      dur,
-      from: { pos: camera.position.clone(), target: controls.target.clone(), fov: camera.fov },
-      to: { pos: V(...cam.pos), target: V(...cam.target), fov: cam.fov },
-    };
-    controls.enabled = false;
-  }
-
-  function updateTween(dt) {
-    const tw = state.tween;
-    if (!tw) return;
-    tw.t = Math.min(1, tw.t + dt / tw.dur);
-    const e = easeInOutCubic(tw.t);
-    camera.position.lerpVectors(tw.from.pos, tw.to.pos, e);
-    controls.target.lerpVectors(tw.from.target, tw.to.target, e);
-    camera.fov = lerp(tw.from.fov, tw.to.fov, e);
-    camera.updateProjectionMatrix();
-    camera.lookAt(controls.target);
-    if (tw.t >= 1) {
-      state.tween = null;
-      controls.enabled = true;
-    }
-  }
-
-  /* ---------------- stage visuals ---------------- */
-  function applyStageVisuals() {
-    for (let i = 0; i < ringGroups.length; i++) {
-      const rg = ringGroups[i];
-      const on = state.active && (state.overview || i === state.stage);
-      rg.group.visible = on;
-      if (!on) continue;
-      const base = state.overview ? 0.14 : 0.34;
-      rg.outer.material.opacity = base;
-      rg.inner.material.opacity = base * 0.8;
-      rg.aura.material.opacity = base * 0.22;
-    }
-    if (state.active && !state.overview) {
-      const s = STAGES[state.stage];
-      spot.visible = true;
-      spot.position.set(s.focus[0], 96, s.focus[2] + 26);
-      spotTarget.position.set(s.focus[0], 2, s.focus[2]);
-      spot.intensity = 12000;
-      spot.color.setHex(0xffdcb4);
-    } else {
-      spot.visible = false;
-    }
-    for (const st of streams) st.update(state.time, isStreamActive(st), 0, true);
-  }
-
-  function isStreamActive(st) {
-    if (!state.active) return false;
-    if (state.overview) return true;
-    return st.def.stages.includes(state.stage);
-  }
-
-  /* ---------------- HUD ---------------- */
-  function updateHud(force = false, nowMs = 0) {
-    if (!force && nowMs - state.lastHud < 90) return;
-    state.lastHud = nowMs;
-    const ov = state.overview;
-    const s = STAGES[state.stage];
-    const key = `${state.stage}|${ov}|${state.playing}|${state.cruise}|${state.speed}|${Math.round(state.stageElapsed * 4)}`;
-    if (key === state.hudCache && !force) return;
-    state.hudCache = key;
-
-    if (elPanel) elPanel.style.setProperty('--accent', `#${new THREE.Color(ov ? 0x9fe9ff : s.color).getHexString()}`);
-    if (elNum) elNum.textContent = ov ? '00' : s.num;
-    if (elCn) elCn.textContent = ov ? '全流程总览' : s.cn;
-    if (elEn) elEn.textContent = ov ? 'PROCESS OVERVIEW · MATERIAL FLOW' : s.en;
-    if (elDesc) {
-      elDesc.textContent = ov
-        ? '原油 → 常减压 → 催化裂化 → 重整加氢 → 产品调和 → 装卸出厂。发光流线表示物料走向，颜色区分原油、高温油气与成品油。'
-        : s.desc;
-    }
-    for (let i = 0; i < dotEls.length; i++) {
-      dotEls[i].className = ov ? 'done' : i === state.stage ? 'on' : i < state.stage ? 'done' : '';
-    }
-    const p = ov ? 1 : clamp01(state.stageElapsed / DUR);
-    if (elBar) elBar.style.width = `${(p * 100).toFixed(1)}%`;
-    if (elTime) {
-      const total = STAGES.length * DUR;
-      const cur = ov ? total : state.stage * DUR + Math.min(state.stageElapsed, DUR);
-      elTime.textContent = `${fmt(cur)} / ${fmt(total)}`;
-    }
-    if (elPlay) {
-      elPlay.textContent = state.playing ? '❚❚' : '▶';
-      elPlay.classList.toggle('on', state.playing);
-    }
-    if (elCruise) elCruise.classList.toggle('on', state.cruise);
-    speedBtns.forEach((b) => b.classList.toggle('on', +b.dataset.speed === state.speed));
-  }
-
-  function fmt(sec) {
-    const s = Math.max(0, Math.round(sec));
-    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  }
+  /* ---------------- HUD + 镜头（拆分模块） ---------------- */
+  const { updateHud, fmt, bindHud } = createHud({ state });
+  const { camApply, flyTo, updateTween } = createTourCam({ camera, controls, state });
 
   /* ---------------- mode ---------------- */
   function enter({ stage = 0, immediate = false, playing = true, cruise = true, overviewMode = false } = {}) {
@@ -773,7 +301,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     if (overviewMode) {
       state.stage = 0;
       state.stageElapsed = 0;
-      applyStageVisuals();
+      flow.applyStageVisuals();
       updateHud(true, performance.now());
       flyTo({ pos: [-300, 200, 392], target: [0, 20, -10], fov: 40 }, { immediate });
       onModeChange(true);
@@ -781,7 +309,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     }
     state.stage = ((stage % STAGES.length) + STAGES.length) % STAGES.length;
     state.stageElapsed = 0;
-    applyStageVisuals();
+    flow.applyStageVisuals();
     updateHud(true, performance.now());
     flyTo(STAGES[state.stage].cam, { immediate });
     onModeChange(true);
@@ -809,7 +337,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     state.overview = false;
     labels.visible = false;
     flowRoot.visible = true;
-    applyStageVisuals();
+    flow.applyStageVisuals();
     updateHud(true, performance.now());
     flyTo(STAGES[state.stage].cam, { immediate, dur });
     return state.stage;
@@ -821,7 +349,7 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     api.time = val;
     state.stageElapsed = state.overview ? 0 : val % DUR;
     updateEnv(val, 0);
-    for (const st of streams) st.update(val, isStreamActive(st), 0, true);
+    flow.refreshStreams(val);
     updateHud(true, performance.now());
     return val;
   }
@@ -925,29 +453,6 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
     }
   }
 
-  /* ---------------- flow update ---------------- */
-  function updateFlow(t, dt) {
-    for (const st of streams) st.update(t, isStreamActive(st), dt);
-    const pulse = 0.5 + 0.5 * Math.sin(t * 2.4);
-    for (let i = 0; i < ringGroups.length; i++) {
-      const rg = ringGroups[i];
-      if (!rg.group.visible) continue;
-      const base = state.overview ? 0.13 : 0.3;
-      rg.outer.material.opacity = base * (0.75 + 0.35 * pulse);
-      rg.inner.material.opacity = base * 0.75 * (0.7 + 0.4 * (1 - pulse));
-      rg.aura.material.opacity = base * (0.18 + 0.12 * pulse);
-    }
-    if (spot.visible) {
-      spot.intensity = 11000 * (0.88 + 0.14 * pulse);
-    }
-    if (state.overview) {
-      // 总览时所有阶段环轻微呼吸
-      for (const rg of ringGroups) {
-        rg.outer.material.opacity = 0.1 + 0.05 * Math.sin(t * 1.4 + rg.stage.focus[0] * 0.05);
-      }
-    }
-  }
-
   /* ---------------- main update ---------------- */
   let lastHudMs = 0;
   function update(dtRaw) {
@@ -971,30 +476,12 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
       }
     }
     updateEnv(state.time, dt);
-    if (state.active) updateFlow(state.time, dt);
+    if (state.active) flow.updateFlow(state.time, dt);
     updateHud(false, performance.now());
   }
 
   /* ---------------- UI wiring ---------------- */
-  function bindClick(el, fn) {
-    if (!el) return;
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      fn();
-      el.blur();
-    });
-  }
-  bindClick(document.querySelector('#animui [data-act="prev"]'), () => gotoStage(state.stage - 1, { dur: 1.7 }));
-  bindClick(document.querySelector('#animui [data-act="next"]'), () => gotoStage(state.stage + 1, { dur: 1.7 }));
-  bindClick(elPlay, () => (state.playing ? pause() : play()));
-  bindClick(elCruise, () => setCruise(!state.cruise));
-  speedBtns.forEach((b) => bindClick(b, () => setSpeed(+b.dataset.speed)));
-  dotEls.forEach((d, i) =>
-    bindClick(d, () => {
-      if (!state.active) enter({ stage: i, immediate: true });
-      else gotoStage(i, { dur: 1.6 });
-    })
-  );
+  bindHud({ gotoStage, enter, play, pause, setCruise, setSpeed });
 
   addEventListener('keydown', (e) => {
     if (!state.active) return;
@@ -1012,7 +499,6 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
       setCruise(!state.cruise);
     }
   });
-
   // 用户拖拽时暂停自动巡游
   controls.addEventListener('start', () => {
     if (!state.active) return;
@@ -1027,9 +513,8 @@ export function createAnimation({ scene, camera, controls, m, plant, labels, set
   // 初始状态（场景里保持环境动效）
   state.playing = true;
   updateEnv(0, 0);
-  for (const st of streams) st.update(0, false, 0, true);
+  for (const st of flow.streams) st.update(0, false, 0, true);
 
   window.__animReady = true;
 
-  return api;
-}
+  return api;}

@@ -296,7 +296,18 @@
     transition: color .18s ease, border-color .18s ease;
   }
   #tour-btn:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
-  body.clean #tour-btn, body.clean #share-btn, body.clean #share-toast { display: none !important; }
+  /* D2 环境音：小按钮，默认静音；clean 截图模式隐藏 */
+  #audio-btn {
+    position: absolute; right: 296px; bottom: 82px; pointer-events: auto; cursor: pointer;
+    background: rgba(10,20,30,0.42); border: 1px solid rgba(120,190,225,0.2); color: #7f9db0;
+    padding: 5px 10px; border-radius: 3px; font-family: "PingFang SC", sans-serif;
+    font-size: 9px; letter-spacing: 1.5px; backdrop-filter: blur(8px);
+    transition: color .18s ease, border-color .18s ease;
+  }
+  #audio-btn:hover { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+  #audio-btn.on { color: #5fd0ff; border-color: rgba(95,208,255,0.55); }
+  @media (max-width: 900px) { #audio-btn { right: 42px; bottom: 112px; } }
+  body.clean #tour-btn, body.clean #share-btn, body.clean #audio-btn, body.clean #share-toast { display: none !important; }
   #share-toast {
     position: fixed; left: 50%; bottom: 122px; transform: translate(-50%, 8px);
     padding: 9px 16px; border-radius: 4px; background: rgba(6,14,22,0.92);
@@ -383,6 +394,7 @@
   <div id="hint">点击设备查看参数 · 拖拽旋转 · 滚轮缩放<br/>1–9 切换机位 · 空格 播放 · ←/→ 阶段 · T 巡游</div>
   <button id="tour-btn" title="导览模式：6 段自动讲解">导览</button>
   <button id="share-btn" title="复制当前视角 / 画质 / 选中设备 / 动画进度的分享链接">分享链接</button>
+  <button id="audio-btn" title="环境音（默认静音）：厂区低频轰鸣 + 间歇蒸汽泄放">♪ 环境音</button>
   <button id="quality-btn" title="切换画质（high / mid / low）">画质 HIGH</button>
   <div id="perf"></div>
 </div>

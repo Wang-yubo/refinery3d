@@ -97,18 +97,18 @@ export function createMaterials() {
 
   const m = {
     /* structure & equipment */
-    steel: std({ map: withRepeat(grime, 3, 3), color: 0xc6ccd2, metalness: 0.78, roughness: 0.38, roughnessMap: withRepeat(rough, 3, 3), normalMap: useNormal ? withRepeat(normal, 3, 3) : undefined, normalScale: new THREE.Vector2(0.45, 0.45) }),
-    steelLight: std({ map: withRepeat(grime, 3, 3), color: 0xdcdfde, metalness: 0.6, roughness: 0.4, roughnessMap: withRepeat(rough, 3, 3), normalMap: useNormal ? withRepeat(normal, 3, 3) : undefined, normalScale: new THREE.Vector2(0.35, 0.35) }),
-    steelDark: std({ map: withRepeat(grime, 4, 4), color: 0x777e85, metalness: 0.75, roughness: 0.44, roughnessMap: withRepeat(rough, 4, 4), normalMap: useNormal ? withRepeat(normal, 3, 3) : undefined, normalScale: new THREE.Vector2(0.5, 0.5) }),
-    painted: std({ map: withRepeat(grime, 3, 3), color: 0xd4d7d2, metalness: 0.4, roughness: 0.5, roughnessMap: withRepeat(rough, 3, 3), normalMap: useNormal ? withRepeat(normal, 3, 3) : undefined, normalScale: new THREE.Vector2(0.4, 0.4) }),
-    insulation: std({ map: withRepeat(insulation, 3, 2), color: 0xffffff, metalness: 0.35, roughness: 0.5, roughnessMap: withRepeat(rough, 2, 2), normalMap: useNormal ? withRepeat(normal, 2, 2) : undefined, normalScale: new THREE.Vector2(0.8, 0.8) }),
-    insulationDirty: std({ map: withRepeat(insulation, 3, 2), color: 0xc2bfb6, metalness: 0.32, roughness: 0.64, roughnessMap: withRepeat(rough, 2, 2), normalMap: useNormal ? withRepeat(normal, 2, 2) : undefined, normalScale: new THREE.Vector2(0.9, 0.9) }),
-    shell: std({ map: withRepeat(shellWet, 4, 2), color: 0xffffff, metalness: 0.32, roughness: 0.5, roughnessMap: withRepeat(rough, 4, 2), normalMap: useNormal ? withRepeat(normal, 2, 2) : undefined, normalScale: new THREE.Vector2(0.3, 0.3) }),
-    shellWhite: std({ map: withRepeat(shellWet, 4, 2), color: 0xf5f5f1, metalness: 0.32, roughness: 0.46, roughnessMap: withRepeat(rough, 4, 2), normalMap: useNormal ? withRepeat(normal, 2, 2) : undefined, normalScale: new THREE.Vector2(0.25, 0.25) }),
-    rust: std({ map: withRepeat(grime, 5, 5), color: 0x9a6440, metalness: 0.35, roughness: 0.85, roughnessMap: withRepeat(rough, 4, 4), normalMap: useNormal ? withRepeat(normal, 4, 4) : undefined, normalScale: new THREE.Vector2(0.9, 0.9) }),
+    steel: std({ map: withRepeat(grime, 3, 3), color: 0xc6ccd2, metalness: 0.78, roughness: 0.38, roughnessMap: withRepeat(rough, 3, 3), ...(useNormal ? { normalMap: withRepeat(normal, 3, 3) } : {}), normalScale: new THREE.Vector2(0.45, 0.45) }),
+    steelLight: std({ map: withRepeat(grime, 3, 3), color: 0xdcdfde, metalness: 0.6, roughness: 0.4, roughnessMap: withRepeat(rough, 3, 3), ...(useNormal ? { normalMap: withRepeat(normal, 3, 3) } : {}), normalScale: new THREE.Vector2(0.35, 0.35) }),
+    steelDark: std({ map: withRepeat(grime, 4, 4), color: 0x777e85, metalness: 0.75, roughness: 0.44, roughnessMap: withRepeat(rough, 4, 4), ...(useNormal ? { normalMap: withRepeat(normal, 3, 3) } : {}), normalScale: new THREE.Vector2(0.5, 0.5) }),
+    painted: std({ map: withRepeat(grime, 3, 3), color: 0xd4d7d2, metalness: 0.4, roughness: 0.5, roughnessMap: withRepeat(rough, 3, 3), ...(useNormal ? { normalMap: withRepeat(normal, 3, 3) } : {}), normalScale: new THREE.Vector2(0.4, 0.4) }),
+    insulation: std({ map: withRepeat(insulation, 3, 2), color: 0xffffff, metalness: 0.35, roughness: 0.5, roughnessMap: withRepeat(rough, 2, 2), ...(useNormal ? { normalMap: withRepeat(normal, 2, 2) } : {}), normalScale: new THREE.Vector2(0.8, 0.8) }),
+    insulationDirty: std({ map: withRepeat(insulation, 3, 2), color: 0xc2bfb6, metalness: 0.32, roughness: 0.64, roughnessMap: withRepeat(rough, 2, 2), ...(useNormal ? { normalMap: withRepeat(normal, 2, 2) } : {}), normalScale: new THREE.Vector2(0.9, 0.9) }),
+    shell: std({ map: withRepeat(shellWet, 4, 2), color: 0xffffff, metalness: 0.32, roughness: 0.5, roughnessMap: withRepeat(rough, 4, 2), ...(useNormal ? { normalMap: withRepeat(normal, 2, 2) } : {}), normalScale: new THREE.Vector2(0.3, 0.3) }),
+    shellWhite: std({ map: withRepeat(shellWet, 4, 2), color: 0xf5f5f1, metalness: 0.32, roughness: 0.46, roughnessMap: withRepeat(rough, 4, 2), ...(useNormal ? { normalMap: withRepeat(normal, 2, 2) } : {}), normalScale: new THREE.Vector2(0.25, 0.25) }),
+    rust: std({ map: withRepeat(grime, 5, 5), color: 0x9a6440, metalness: 0.35, roughness: 0.85, roughnessMap: withRepeat(rough, 4, 4), ...(useNormal ? { normalMap: withRepeat(normal, 4, 4) } : {}), normalScale: new THREE.Vector2(0.9, 0.9) }),
 
     /* pipes (colour coded) */
-    pipeSilver: std({ map: withRepeat(grime, 6, 1), color: 0xbfc4c8, metalness: 0.88, roughness: 0.3, roughnessMap: withRepeat(rough, 6, 1), normalMap: useNormal ? withRepeat(normal, 4, 1) : undefined, normalScale: new THREE.Vector2(0.3, 0.3) }),
+    pipeSilver: std({ map: withRepeat(grime, 6, 1), color: 0xbfc4c8, metalness: 0.88, roughness: 0.3, roughnessMap: withRepeat(rough, 6, 1), ...(useNormal ? { normalMap: withRepeat(normal, 4, 1) } : {}), normalScale: new THREE.Vector2(0.3, 0.3) }),
     pipeGray: std({ map: withRepeat(grime, 6, 1), color: 0x969ca3, metalness: 0.84, roughness: 0.36, roughnessMap: withRepeat(rough, 6, 1) }),
     pipeYellow: std({ map: withRepeat(grime, 6, 1), color: 0xd2aa46, metalness: 0.6, roughness: 0.42, roughnessMap: withRepeat(rough, 6, 1) }),
     pipeOrange: std({ map: withRepeat(grime, 6, 1), color: 0xbc6a42, metalness: 0.55, roughness: 0.46, roughnessMap: withRepeat(rough, 6, 1) }),
@@ -116,7 +116,7 @@ export function createMaterials() {
     pipeRed: std({ map: withRepeat(grime, 6, 1), color: 0xa6483e, metalness: 0.55, roughness: 0.46, roughnessMap: withRepeat(rough, 6, 1) }),
 
     /* ground */
-    concrete: std({ map: withRepeat(concrete, 8, 8), color: 0xffffff, metalness: 0.0, roughness: 0.9, roughnessMap: withRepeat(rough, 8, 8), normalMap: useNormal ? withRepeat(normal, 8, 8) : undefined, normalScale: new THREE.Vector2(0.5, 0.5) }),
+    concrete: std({ map: withRepeat(concrete, 8, 8), color: 0xffffff, metalness: 0.0, roughness: 0.9, roughnessMap: withRepeat(rough, 8, 8), ...(useNormal ? { normalMap: withRepeat(normal, 8, 8) } : {}), normalScale: new THREE.Vector2(0.5, 0.5) }),
     concreteSmooth: std({ map: withRepeat(concrete, 3, 3), color: 0xc0beb8, metalness: 0.0, roughness: 0.8, roughnessMap: withRepeat(rough, 3, 3) }),
     asphalt: std({ map: withRepeat(asphaltOil, 8, 8), color: 0xffffff, metalness: 0.05, roughness: 0.9, roughnessMap: withRepeat(rough, 8, 8) }),
     gravel: std({ map: withRepeat(gravel, 12, 12), color: 0xffffff, metalness: 0.0, roughness: 1.0 }),

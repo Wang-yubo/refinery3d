@@ -1,0 +1,139 @@
+{
+  "generatedAt": "2026-11-22T06:28:09.140Z",
+  "branch": "opt/d-batch",
+  "baseline": "main @ a405f80",
+  "note": "像素对比为 1600x900、clean、high、autoexposure=0、motion=0、paused 的同机位截图；音频帧开销为 1600x900 low 档 rAF 中位帧时。",
+  "pixel": {
+    "stage2t9": {
+      "mean": 0,
+      "max": 0,
+      "over2Pct": 0
+    },
+    "stage4t5": {
+      "mean": 0,
+      "max": 0,
+      "over2Pct": 0
+    },
+    "flowcam": {
+      "mean": 0,
+      "max": 0,
+      "over2Pct": 0
+    }
+  },
+  "pixelPass": true,
+  "equip": {
+    "count": 35,
+    "maxCenterDelta": 0,
+    "bad": []
+  },
+  "flowSame": true,
+  "audio": {
+    "default": {
+      "on": false,
+      "want": false,
+      "ctx": "none",
+      "volume": 0.5,
+      "steamBursts": 0,
+      "armed": false
+    },
+    "btnInitial": "♪ 环境音",
+    "frameMs": {
+      "off": 16.7,
+      "on": [
+        16.7
+      ],
+      "offAgain": 16.7
+    },
+    "afterClick": {
+      "on": true,
+      "want": true,
+      "ctx": "running",
+      "volume": 0.5,
+      "steamBursts": 0,
+      "armed": false
+    },
+    "btnOn": "♪ 环境音 开",
+    "afterOff": {
+      "on": false,
+      "want": false,
+      "ctx": "suspended",
+      "volume": 0.5,
+      "steamBursts": 0,
+      "armed": false
+    },
+    "hiddenCtx": "suspended",
+    "steamBursts": 2,
+    "stored": "1",
+    "frameAvg": {
+      "off": 16.7,
+      "on": 16.7
+    },
+    "frameOverheadPct": 0,
+    "pass": true
+  },
+  "files": {
+    "src/animation.js": "1034 → 520",
+    "src/interaction.js": "548 → 326",
+    "src/data/stages.js": "新增 216",
+    "src/data/layout.js": "新增 72",
+    "data/layout.json": "新增 35 台 / 19 KB",
+    "src/anim/flow.js": "新增 208",
+    "src/anim/tour.js": "新增 52",
+    "src/anim/hud.js": "新增 97",
+    "src/anim/util.js": "新增 11",
+    "src/audio.js": "新增 206"
+  },
+  "imports": {
+    "files": 28,
+    "relativeDeps": 45,
+    "cycles": 0
+  },
+  "animCheck": "ALL CHECKS PASSED",
+  "errors": [],
+  "checkAll": {
+    "pass": true,
+    "totalSec": 334.2,
+    "steps": [
+      {
+        "id": "shots",
+        "name": "截图抽检（hero/cdu/aerial）",
+        "status": "pass",
+        "exitCode": 0,
+        "ms": 74423,
+        "signal": null,
+        "tail": "[log] [timing] materials 3.0s\n[log] [snapshot] load 4.6s decor 0.1s\n[log] [timing] plant prebaked 22.3MB/527209 verts 8.8s\n[log] [timing] contact shadows 9.7s\n[log] [refinery] ready {\"shots\":[\"aerial\",\"hero\",\"cdu\",\"tanks\",\"fcc\",\"night\",\"flow\",\"day\",\"top\"],\"stages\":6}\n[info] [boot] full quality ready 53.7s (lean ready was earlier)",
+        "failedLines": []
+      },
+      {
+        "id": "anim",
+        "name": "工艺流程动画校验",
+        "status": "pass",
+        "exitCode": 0,
+        "ms": 95419,
+        "signal": null,
+        "tail": "[log] [snapshot] load 5.9s decor 0.0s\n[log] [refinery] ready {\"shots\":[\"aerial\",\"hero\",\"cdu\",\"tanks\",\"fcc\",\"night\",\"flow\",\"day\",\"top\"],\"stages\":6}\n[info] [boot] full quality ready 56.4s (lean ready was earlier)\n\n--- result ---\nALL CHECKS PASSED",
+        "failedLines": []
+      },
+      {
+        "id": "equip",
+        "name": "设备拾取 / 交互校验",
+        "status": "pass",
+        "exitCode": 0,
+        "ms": 72616,
+        "signal": null,
+        "tail": "ready 59.1s\nequip count 35\nstate {\"selected\":\"cdu-atm\",\"hover\":null,\"card\":true,\"tween\":false,\"camera\":[-134.5,60.9,-20.7],\"target\":[-48,29,-30]}\nshot {\"mean\":80.4,\"darkPct\":0.8,\"clipPct\":0,\"hist\":[2.9,19.8,7,11.1,13.5,11.9,11.9,5.4,3.2,3,6.5,2.6,0.5,0.3,0.2,0.2]}\nerrors none",
+        "failedLines": []
+      },
+      {
+        "id": "opt2",
+        "name": "画质对比截图（opt2）",
+        "status": "pass",
+        "exitCode": 0,
+        "ms": 91707,
+        "signal": null,
+        "tail": "--- deltas vs A 批 ---\naerial 115.2 ref 115.6 delta -0.4\nhero 122.7 ref 123.1 delta -0.4\ncdu 113.6 ref 113 delta 0.6\nerrors none\nnotes none",
+        "failedLines": []
+      }
+    ]
+  }
+}
