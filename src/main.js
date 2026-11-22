@@ -1374,6 +1374,31 @@ if (!isClean) {
 
 /* E5：二维码 / 物料平衡数据 */
 document.getElementById('share-btn')?.addEventListener('click', () => qrShare.open());
+/* ------------------------------------------------------------------ */
+/* fix/ui-layout：窄屏抽屉化 + 底部条高度变量                            */
+/* ------------------------------------------------------------------ */
+const narrowUi = () => innerWidth <= 900;
+function syncBarHeight() {
+  const el = document.getElementById('bar');
+  document.documentElement.style.setProperty('--bar-h', `${el ? el.offsetHeight : 36}px`);
+}
+function applyResponsiveUi() {
+  syncBarHeight();
+  const ex = document.getElementById('explorer');
+  if (narrowUi()) {
+    ex?.classList.add('closed');
+    processPanel.setOpen(false);
+  }
+}
+applyResponsiveUi();
+addEventListener('resize', applyResponsiveUi);
+/* #bar 高度会随 body.flow / 窄屏换行变化：用 ResizeObserver 持续回写 --bar-h */
+if (typeof ResizeObserver !== 'undefined') {
+  const barEl = document.getElementById('bar');
+  if (barEl) new ResizeObserver(syncBarHeight).observe(barEl);
+}
+window.__applyResponsiveUi = applyResponsiveUi;
+
 window.__qrState = () => ({ ...qrShare.state(), balance: validateBalance() });
 window.__processState = () => ({ ...processPanel.state(), data: validateBalance() });
 

@@ -565,6 +565,21 @@ node tools/verify-b.mjs --fps-only --raf --vp=2560x1440
 | `__cacheState` | 快照缓存 `{source,ms,bytes,key,idb}` |
 | `__swState` | Service Worker `{registered,active,scope}` |
 
+### fix/ui-layout：浮层布局审计与修复
+
+浮层统一为三段式栅格（左列 / 右列 / 底部），不再各自 `position: fixed` 定位：
+
+| 区域 | 内容 | 规则 |
+| --- | --- | --- |
+| 左列 `#left-rail` | 透视说明 → 工艺参数 → 设备卡 | flex column，`gap: 8px`，底边留出阶段条 |
+| 右列 `#right-rail` | 按钮群 → 设备清单 → 小地图 | 按钮 `flex-wrap` 右上对齐，清单/小地图顺序排列 |
+| 底部 `#bar` | 机位 / 阶段按钮 | 高度写入 `--bar-h`（ResizeObserver），字幕与流程条据此上移 ≥8 px |
+
+- 审计工具 `node tools/ui-audit.mjs`：7 视口 × 9 状态（默认 / 清单 / 动画 HUD / 流程示意 / 参数 / 透视 / 设备卡 / 导览 / 分享），输出 `diag/ui-audit.json`，标注重叠对、越界、控件最小边长。
+- 结果：重叠 **176 → 0 对**、越界 **10 → 0**、控件最小边长 **20 → 36 px**（窄屏 44 px）；3D 静态帧（`?clean=1`）前后逐像素 **0/0**。
+- 窄屏（≤900px）：清单默认折叠、小地图隐藏、参数面板默认收起；左列卡片打开时右列清单让位（`:has()`）。`body.clean` 下两列整体隐藏。
+- 前后对比截图：`renders/fix/{before,after}-<视口>-{default,explorer,all}.png`（1920/1440/1280）。
+
 ### 一键冒烟 / CI
 
 ```bash
@@ -642,7 +657,7 @@ refinery3d/
 ├── sw.js                   # E1 Service Worker（应用壳 + 静态资源 cache-first）
 ├── icons/                  # E1 PWA 图标（192/512，canvas 程序化生成）
 ├── tools/                  # serve / 截图 / 动画与拾取校验 / 冒烟 / 打包 / 冷启动 profiling / B 批验收
-├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批，d = D 批，e = E 批）
+├── renders/                # 效果图与对比截图（opt = A 批，opt2 = A6b，b = B 批，d = D 批，e = E 批，fix = UI 布局）
 └── .github/workflows/ci.yml
 ```
 
